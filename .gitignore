@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+
+# PyInstaller
+dist/
+build/
+*.manifest
+
+# Build artifacts
+build_manifest_v*.json
+小黑工具箱_v*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE
+.vscode/
+.idea/
+
+# EasyOCR models (too large for git)
+.EasyOCR/
+
+# Logs
+*.log

@@ -1,0 +1,510 @@
+{% extends "base.html" %}
+
+{% block title %}OCR 文字辨識 — 小黑工具箱{% endblock %}
+{% block nav_ocr %}active{% endblock %}
+
+{% block extra_css %}
+.drop-zone {
+    border: 2px dashed rgba(71, 85, 105, 0.5);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: rgba(14, 165, 233, 0.5);
+    background: rgba(14, 165, 233, 0.03);
+}
+
+.drop-zone.drag-over {
+    border-color: rgba(14, 165, 233, 0.8);
+    background: rgba(14, 165, 233, 0.06);
+    transform: scale(1.01);
+}
+
+.drop-zone.has-image {
+    padding: 1rem;
+    min-height: auto;
+}
+
+.preview-img {
+    max-width: 100%;
+    max-height: 350px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+/* 語言選擇 */
+.lang-option {
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    background: rgba(17, 24, 39, 0.5);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.lang-option:hover {
+    border-color: rgba(14, 165, 233, 0.3);
+    color: #e2e8f0;
+}
+
+.lang-option.active {
+    border-color: rgba(14, 165, 233, 0.6);
+    color: #0ea5e9;
+    background: rgba(14, 165, 233, 0.1);
+}
+
+/* 結果區 */
+.result-area {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-radius: 12px;
+    padding: 1rem;
+    width: 100%;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    min-height: 200px;
+    resize: vertical;
+    font-family: inherit;
+    line-height: 1.8;
+}
+
+.result-area:focus {
+    outline: none;
+    border-color: rgba(14, 165, 233, 0.5);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+
+/* 處理進度 */
+.processing-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 8, 13, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    z-index: 20;
+}
+
+.pulse-ring {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: #0ea5e9;
+    border-right-color: #6366f1;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1.5rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* 辨識結果統計 */
+.stat-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    background: rgba(14, 165, 233, 0.1);
+    color: #0ea5e9;
+}
+
+/* Ctrl+V 提示閃爍 */
+@keyframes pulse-border {
+    0%, 100% { border-color: rgba(71, 85, 105, 0.5); }
+    50% { border-color: rgba(14, 165, 233, 0.5); }
+}
+
+.paste-hint {
+    animation: pulse-border 2s ease-in-out infinite;
+}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 頁面標題 -->
+    <div class="mb-8 animate-in">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-indigo-500 flex items-center justify-center">
+                <i data-lucide="scan-text" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-100">OCR 文字辨識</h1>
+                <p class="text-sm text-slate-400">上傳圖片或貼上截圖，AI 自動辨識圖中文字</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要內容區 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- 左側：上傳區 -->
+        <div class="flex flex-col gap-4 animate-in animate-delay-1">
+            <div class="glass p-6">
+                <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                    <i data-lucide="upload" class="w-4 h-4 text-sky-400"></i>
+                    上傳圖片
+                </h2>
+
+                <!-- 拖曳上傳區 -->
+                <div id="dropZone" class="drop-zone paste-hint" onclick="document.getElementById('fileInput').click()">
+                    <div id="uploadPrompt">
+                        <i data-lucide="image-plus" class="w-14 h-14 text-slate-500 mx-auto mb-4"></i>
+                        <p class="text-slate-300 font-medium mb-1">拖曳圖片到這裡，或點擊選擇</p>
+                        <p class="text-slate-500 text-sm mb-3">支援 PNG、JPG、WebP 格式</p>
+                        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20">
+                            <i data-lucide="clipboard" class="w-3.5 h-3.5 text-sky-400"></i>
+                            <span class="text-sky-400 text-xs font-semibold">Ctrl+V 直接貼上截圖</span>
+                        </div>
+                    </div>
+                    <div id="imagePreview" class="hidden w-full">
+                        <img id="previewImg" class="preview-img mx-auto" alt="預覽圖片">
+                    </div>
+                    <input type="file" id="fileInput" class="hidden" accept="image/png,image/jpeg,image/webp">
+                </div>
+
+                <!-- 語言選擇 -->
+                <div class="mt-4">
+                    <label class="text-xs text-slate-400 mb-2 block flex items-center gap-1.5">
+                        <i data-lucide="languages" class="w-3.5 h-3.5"></i>
+                        辨識語言（可多選）
+                    </label>
+                    <div class="flex flex-wrap gap-2">
+                        <button class="lang-option active" data-lang="ch_tra" onclick="toggleLang(this)">繁體中文</button>
+                        <button class="lang-option active" data-lang="en" onclick="toggleLang(this)">English</button>
+                        <button class="lang-option" data-lang="ja" onclick="toggleLang(this)">日本語</button>
+                        <button class="lang-option" data-lang="ko" onclick="toggleLang(this)">한국어</button>
+                        <button class="lang-option" data-lang="ch_sim" onclick="toggleLang(this)">简体中文</button>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-2">
+                        <i data-lucide="info" class="w-3 h-3 inline"></i>
+                        選越少語言，辨識越快越準確
+                    </p>
+                </div>
+
+                <!-- 操作按鈕 -->
+                <div class="flex gap-3 mt-4">
+                    <button id="ocrBtn" disabled class="btn-primary flex-1 justify-center"
+                            style="background: linear-gradient(135deg, #0ea5e9, #6366f1); box-shadow: 0 4px 20px rgba(14,165,233,0.25);"
+                            onclick="startOCR()">
+                        <i data-lucide="scan-text" class="w-5 h-5"></i>
+                        開始辨識
+                    </button>
+                    <button id="clearBtn" class="btn-primary justify-center"
+                            style="background: linear-gradient(135deg, #475569, #334155); box-shadow: none;"
+                            onclick="clearAll()">
+                        <i data-lucide="trash-2" class="w-5 h-5"></i>
+                        清除
+                    </button>
+                </div>
+
+                <!-- 提示資訊 -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="quality-badge bg-sky-500/10 text-sky-400">
+                        <i data-lucide="brain" class="w-3 h-3"></i> EasyOCR 引擎
+                    </span>
+                    <span class="quality-badge bg-blue-500/10 text-blue-400">
+                        <i data-lucide="wifi-off" class="w-3 h-3"></i> 100% 離線
+                    </span>
+                    <span class="quality-badge bg-emerald-500/10 text-emerald-400">
+                        <i data-lucide="shield-check" class="w-3 h-3"></i> 隱私安全
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：結果區 -->
+        <div class="flex flex-col gap-4 animate-in animate-delay-2">
+            <div class="glass p-6 relative" id="resultPanel">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-base font-semibold text-slate-200 flex items-center gap-2">
+                        <i data-lucide="file-text" class="w-4 h-4 text-emerald-400"></i>
+                        辨識結果
+                    </h2>
+                    <div id="resultStats" class="hidden flex items-center gap-2">
+                        <span id="charStat" class="stat-chip"></span>
+                        <span id="timeStat" class="stat-chip" style="background: rgba(168,85,247,0.1); color: #a855f7;"></span>
+                    </div>
+                </div>
+
+                <!-- 空狀態 -->
+                <div id="emptyState" class="flex flex-col items-center justify-center py-16 text-slate-500">
+                    <i data-lucide="scan-text" class="w-16 h-16 mb-4 opacity-20"></i>
+                    <p class="font-medium">尚未辨識</p>
+                    <p class="text-sm mt-1">上傳圖片並點擊「開始辨識」</p>
+                </div>
+
+                <!-- 結果文字區 -->
+                <textarea id="resultText" class="result-area hidden" placeholder="辨識結果會顯示在這裡..." readonly></textarea>
+
+                <!-- 操作按鈕 -->
+                <div id="resultBtns" class="hidden flex gap-3 mt-4">
+                    <button class="btn-primary flex-1 justify-center"
+                            style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 20px rgba(16,185,129,0.25);"
+                            onclick="copyResult()">
+                        <i data-lucide="clipboard-copy" class="w-5 h-5"></i>
+                        複製全部
+                    </button>
+                    <button class="btn-primary justify-center"
+                            style="background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 4px 20px rgba(99,102,241,0.25);"
+                            onclick="downloadResult()">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                        下載 TXT
+                    </button>
+                </div>
+
+                <!-- 處理中動畫 -->
+                <div id="processingOverlay" class="processing-overlay hidden">
+                    <div class="pulse-ring"></div>
+                    <p class="text-slate-200 font-semibold mb-1">AI 正在辨識文字...</p>
+                    <p class="text-slate-400 text-sm" id="processingTip">首次使用需下載模型，請稍候</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── DOM ──
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadPrompt = document.getElementById('uploadPrompt');
+    const imagePreview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
+    const ocrBtn = document.getElementById('ocrBtn');
+    const emptyState = document.getElementById('emptyState');
+    const resultText = document.getElementById('resultText');
+    const resultBtns = document.getElementById('resultBtns');
+    const resultStats = document.getElementById('resultStats');
+    const processingOverlay = document.getElementById('processingOverlay');
+    const processingTip = document.getElementById('processingTip');
+
+    let currentFile = null;
+
+    // ── 拖曳上傳 ──
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            handleFile(file);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    // ── Ctrl+V 貼上截圖 ──
+    document.addEventListener('paste', (e) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (const item of items) {
+            if (item.type.startsWith('image/')) {
+                const file = item.getAsFile();
+                if (file) handleFile(file);
+                break;
+            }
+        }
+    });
+
+    // ── 處理檔案 ──
+    function handleFile(file) {
+        currentFile = file;
+        const url = URL.createObjectURL(file);
+        previewImg.src = url;
+        uploadPrompt.classList.add('hidden');
+        imagePreview.classList.remove('hidden');
+        dropZone.classList.add('has-image');
+        dropZone.classList.remove('paste-hint');
+        ocrBtn.disabled = false;
+
+        // 重置結果
+        emptyState.classList.remove('hidden');
+        resultText.classList.add('hidden');
+        resultBtns.classList.add('hidden');
+        resultStats.classList.add('hidden');
+
+        lucide.createIcons();
+    }
+
+    // ── 語言選擇 ──
+    function toggleLang(btn) {
+        btn.classList.toggle('active');
+        // 至少要選一個
+        const actives = document.querySelectorAll('.lang-option.active');
+        if (actives.length === 0) {
+            btn.classList.add('active');
+        }
+    }
+
+    function getSelectedLangs() {
+        return Array.from(document.querySelectorAll('.lang-option.active'))
+            .map(btn => btn.dataset.lang);
+    }
+
+    // ── 開始 OCR ──
+    async function startOCR() {
+        if (!currentFile) return;
+
+        const langs = getSelectedLangs();
+        const startTime = Date.now();
+
+        ocrBtn.disabled = true;
+        ocrBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> 辨識中...';
+        emptyState.classList.add('hidden');
+        resultText.classList.add('hidden');
+        resultBtns.classList.add('hidden');
+        resultStats.classList.add('hidden');
+        processingOverlay.classList.remove('hidden');
+
+        try {
+            const formData = new FormData();
+            formData.append('image', currentFile);
+            formData.append('languages', JSON.stringify(langs));
+
+            const response = await fetch('/api/ocr', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+
+                resultText.value = data.text;
+                resultText.classList.remove('hidden');
+                resultText.removeAttribute('readonly');
+                resultBtns.classList.remove('hidden');
+                processingOverlay.classList.add('hidden');
+
+                // 統計
+                document.getElementById('charStat').textContent = `${data.text.length} 字`;
+                document.getElementById('timeStat').textContent = `${elapsed} 秒`;
+                resultStats.classList.remove('hidden');
+
+                ocrBtn.innerHTML = '<i data-lucide="scan-text" class="w-5 h-5"></i> 重新辨識';
+                ocrBtn.disabled = false;
+                lucide.createIcons();
+            } else {
+                throw new Error(data.error || '辨識失敗');
+            }
+        } catch (err) {
+            processingOverlay.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            alert('辨識失敗：' + err.message);
+            ocrBtn.innerHTML = '<i data-lucide="scan-text" class="w-5 h-5"></i> 開始辨識';
+            ocrBtn.disabled = false;
+            lucide.createIcons();
+        }
+    }
+
+    // ── 複製結果 ──
+    async function copyResult() {
+        const text = resultText.value;
+        if (!text) return;
+
+        try {
+            await navigator.clipboard.writeText(text);
+            const btn = event.target.closest('button');
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i> 已複製！';
+            lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = orig;
+                lucide.createIcons();
+            }, 2000);
+        } catch (err) {
+            // fallback
+            resultText.select();
+            document.execCommand('copy');
+        }
+    }
+
+    // ── 下載 TXT ──
+    function downloadResult() {
+        const text = resultText.value;
+        if (!text) return;
+
+        const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        const fileName = currentFile ? currentFile.name.replace(/\.[^.]+$/, '') : 'ocr';
+        a.href = url;
+        a.download = fileName + '_辨識結果.txt';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    // ── 清除全部 ──
+    function clearAll() {
+        currentFile = null;
+        fileInput.value = '';
+        uploadPrompt.classList.remove('hidden');
+        imagePreview.classList.add('hidden');
+        dropZone.classList.remove('has-image');
+        dropZone.classList.add('paste-hint');
+        ocrBtn.disabled = true;
+        ocrBtn.innerHTML = '<i data-lucide="scan-text" class="w-5 h-5"></i> 開始辨識';
+
+        emptyState.classList.remove('hidden');
+        resultText.classList.add('hidden');
+        resultText.value = '';
+        resultBtns.classList.add('hidden');
+        resultStats.classList.add('hidden');
+
+        lucide.createIcons();
+    }
+
+    lucide.createIcons();
+</script>
+{% endblock %}

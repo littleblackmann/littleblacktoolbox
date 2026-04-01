@@ -1,0 +1,877 @@
+{% extends "base.html" %}
+
+{% block title %}文字轉檔工坊 — 小黑工具箱{% endblock %}
+{% block nav_text %}active{% endblock %}
+
+{% block extra_css %}
+.converter-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 1.25rem;
+    align-items: start;
+}
+
+@media (max-width: 860px) {
+    .converter-grid { grid-template-columns: 1fr; }
+    .middle-controls { flex-direction: row !important; flex-wrap: wrap; justify-content: center; padding-top: 0 !important; }
+    .convert-arrow { transform: rotate(90deg); }
+}
+
+.panel {
+    background: rgba(17, 24, 39, 0.5);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color 0.3s;
+}
+.panel:hover { border-color: rgba(51, 65, 85, 0.8); }
+
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+    background: rgba(26, 34, 52, 0.5);
+}
+
+.panel-label {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: #64748b;
+}
+
+.format-select {
+    background: rgba(6, 8, 13, 0.6);
+    color: #60a5fa;
+    border: 1px solid rgba(30, 41, 59, 0.8);
+    border-radius: 8px;
+    padding: 0.35rem 0.6rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    cursor: pointer;
+    outline: none;
+    transition: border-color 0.2s;
+}
+.format-select:focus { border-color: #3b82f6; }
+.format-select option { background: #0a0e17; color: #f1f5f9; }
+
+textarea {
+    width: 100%;
+    min-height: 380px;
+    padding: 1rem;
+    background: transparent;
+    border: none;
+    color: #f1f5f9;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    resize: vertical;
+    outline: none;
+}
+textarea::placeholder { color: #475569; }
+
+.output-area {
+    width: 100%;
+    min-height: 380px;
+    padding: 1rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    line-height: 1.65;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    color: #f1f5f9;
+}
+
+.middle-controls {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    padding-top: 2.5rem;
+}
+
+.ctrl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.55rem 1rem;
+    border: 1px solid rgba(30, 41, 59, 0.8);
+    border-radius: 10px;
+    background: rgba(17, 24, 39, 0.5);
+    color: #cbd5e1;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.25s;
+    white-space: nowrap;
+}
+.ctrl-btn:hover {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.08);
+    color: #60a5fa;
+}
+
+.ctrl-btn-primary {
+    background: linear-gradient(135deg, rgba(59,130,246,0.15), rgba(52,211,153,0.08));
+    border-color: rgba(59,130,246,0.4);
+    color: #60a5fa;
+    font-size: 0.85rem;
+    padding: 0.65rem 1.3rem;
+}
+.ctrl-btn-primary:hover {
+    background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(52,211,153,0.15));
+    box-shadow: 0 0 20px rgba(59,130,246,0.1);
+}
+
+.ctrl-btn-danger {
+    color: #f87171;
+    border-color: rgba(248,113,113,0.3);
+}
+.ctrl-btn-danger:hover {
+    border-color: #f87171;
+    background: rgba(248,113,113,0.08);
+}
+
+.convert-arrow {
+    font-size: 1.2rem;
+    color: #60a5fa;
+    transition: transform 0.3s;
+}
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.45rem 1rem;
+    border-top: 1px solid rgba(30, 41, 59, 0.6);
+    font-size: 0.7rem;
+    color: #475569;
+}
+
+.status-dot {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    margin-right: 6px;
+    background: #475569;
+}
+.status-dot.success { background: #34d399; }
+.status-dot.error { background: #f87171; }
+.status-dot.loading { background: #fbbf24; animation: pulse 1s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+.output-tabs { display: flex; gap: 0; }
+.output-tab {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.7rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    color: #475569;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+.output-tab:hover { color: #cbd5e1; }
+.output-tab.active { color: #60a5fa; border-bottom-color: #3b82f6; }
+
+.format-chips {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+    margin-bottom: 1.5rem;
+}
+.format-chip {
+    padding: 0.25rem 0.6rem;
+    background: rgba(17, 24, 39, 0.5);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    color: #64748b;
+    transition: all 0.2s;
+}
+.format-chip:hover { border-color: #3b82f6; color: #60a5fa; }
+.format-chip.highlight { border-color: rgba(52,211,153,0.5); color: #34d399; background: rgba(52,211,153,0.06); }
+
+.text-drop-zone {
+    border: 2px dashed rgba(71, 85, 105, 0.4);
+    border-radius: 14px;
+    padding: 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    margin-bottom: 1.25rem;
+    position: relative;
+}
+.text-drop-zone:hover, .text-drop-zone.drag-over {
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(59, 130, 246, 0.03);
+}
+.text-drop-zone input[type="file"] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer;
+}
+
+.file-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.25rem 0.6rem;
+    background: rgba(59,130,246,0.08);
+    border: 1px solid rgba(59,130,246,0.25);
+    border-radius: 8px;
+    font-size: 0.72rem;
+    color: #60a5fa;
+}
+.file-tag .close { cursor: pointer; opacity: 0.6; transition: opacity 0.2s; }
+.file-tag .close:hover { opacity: 1; }
+
+.html-preview {
+    padding: 1rem;
+    min-height: 380px;
+    overflow: auto;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 0.88rem;
+    line-height: 1.7;
+    color: #e2e8f0;
+}
+.html-preview h1, .html-preview h2, .html-preview h3 { margin: 1em 0 0.5em; color: #60a5fa; }
+.html-preview p { margin-bottom: 0.8em; }
+.html-preview code { background: #0f172a; padding: 0.15em 0.4em; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.85em; }
+.html-preview pre { background: #0f172a; padding: 1em; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; }
+.html-preview pre code { background: none; padding: 0; }
+.html-preview table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+.html-preview th, .html-preview td { border: 1px solid #1e293b; padding: 0.5em 0.8em; text-align: left; }
+.html-preview th { background: rgba(26,34,52,0.5); }
+.html-preview ul, .html-preview ol { padding-left: 1.5em; margin-bottom: 0.8em; }
+.html-preview blockquote { border-left: 3px solid #3b82f6; padding-left: 1em; color: #94a3b8; margin-bottom: 0.8em; }
+
+.pdf-notice {
+    display: none;
+    padding: 0.4rem 0.8rem;
+    background: rgba(251,191,36,0.06);
+    border-top: 1px solid rgba(251,191,36,0.15);
+    font-size: 0.72rem;
+    color: #fbbf24;
+    text-align: center;
+}
+.pdf-notice.show { display: block; }
+
+.loading-overlay {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: rgba(6,8,13,0.85);
+    z-index: 10;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    gap: 0.8rem;
+}
+.loading-overlay.show { display: flex; }
+.loading-spinner {
+    width: 28px; height: 28px;
+    border: 3px solid rgba(30,41,59,0.6);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.toast-msg {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: rgba(26, 34, 52, 0.95);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(59,130,246,0.3);
+    color: #f1f5f9;
+    padding: 0.6rem 1.3rem;
+    border-radius: 10px;
+    font-size: 0.82rem;
+    z-index: 999;
+    transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+.toast-msg.show { transform: translateX(-50%) translateY(0); }
+{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 頁面標題 -->
+    <div class="mb-6 animate-in">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-400 flex items-center justify-center">
+                <i data-lucide="file-text" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-100">文字轉檔工坊</h1>
+                <p class="text-sm text-slate-400">多種格式互轉 — 離線可用，資料不上傳</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 格式標籤 -->
+    <div class="format-chips animate-in animate-delay-1">
+        <span class="format-chip highlight">PDF</span>
+        <span class="format-chip">Markdown</span>
+        <span class="format-chip">HTML</span>
+        <span class="format-chip">CSV</span>
+        <span class="format-chip">JSON</span>
+        <span class="format-chip">YAML</span>
+        <span class="format-chip">TSV</span>
+        <span class="format-chip">XML</span>
+        <span class="format-chip">純文字</span>
+    </div>
+
+    <!-- 拖放上傳區 -->
+    <div class="text-drop-zone animate-in animate-delay-1" id="dropZone">
+        <input type="file" id="fileInput" accept=".txt,.md,.markdown,.html,.htm,.csv,.tsv,.json,.yaml,.yml,.xml,.pdf">
+        <div class="flex items-center justify-center gap-3">
+            <i data-lucide="file-up" class="w-5 h-5 text-slate-500"></i>
+            <span class="text-slate-400 text-sm">拖放檔案到這裡，或<span class="text-blue-400 underline">點擊選擇</span>（支援 PDF）</span>
+        </div>
+        <div id="fileTag" class="mt-2"></div>
+    </div>
+
+    <!-- 轉換器主體 -->
+    <div class="converter-grid animate-in animate-delay-2">
+        <!-- 輸入面板 -->
+        <div class="panel" style="position:relative">
+            <div class="loading-overlay" id="loadingOverlay">
+                <div class="loading-spinner"></div>
+                <div class="text-xs text-slate-400">正在解析 PDF...</div>
+            </div>
+            <div class="panel-header">
+                <span class="panel-label">輸入</span>
+                <select class="format-select" id="inputFormat">
+                    <option value="pdf">PDF（文字提取）</option>
+                    <option value="markdown" selected>Markdown</option>
+                    <option value="html">HTML</option>
+                    <option value="csv">CSV</option>
+                    <option value="tsv">TSV</option>
+                    <option value="json">JSON</option>
+                    <option value="yaml">YAML</option>
+                    <option value="xml">XML</option>
+                    <option value="text">純文字</option>
+                </select>
+            </div>
+            <div class="panel-body">
+                <textarea id="inputText" placeholder="在這裡貼上內容，或透過上方拖放檔案..."></textarea>
+            </div>
+            <div class="status-bar">
+                <span id="inputStats">0 字元 · 0 行</span>
+                <span id="pdfPageInfo"></span>
+            </div>
+        </div>
+
+        <!-- 中間控制 -->
+        <div class="middle-controls">
+            <button class="ctrl-btn ctrl-btn-primary" id="convertBtn">
+                <span class="convert-arrow">→</span> 轉換
+            </button>
+            <button class="ctrl-btn" id="swapBtn">
+                <i data-lucide="arrow-left-right" class="w-3.5 h-3.5"></i> 交換
+            </button>
+            <button class="ctrl-btn" id="copyBtn">
+                <i data-lucide="clipboard-copy" class="w-3.5 h-3.5"></i> 複製
+            </button>
+            <button class="ctrl-btn" id="downloadBtn">
+                <i data-lucide="download" class="w-3.5 h-3.5"></i> 下載
+            </button>
+            <button class="ctrl-btn ctrl-btn-danger" id="clearBtn">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 清除
+            </button>
+        </div>
+
+        <!-- 輸出面板 -->
+        <div class="panel">
+            <div class="panel-header">
+                <div class="flex items-center gap-3">
+                    <span class="panel-label">輸出</span>
+                    <div class="output-tabs">
+                        <div class="output-tab active" data-tab="raw">原始碼</div>
+                        <div class="output-tab" data-tab="preview">預覽</div>
+                    </div>
+                </div>
+                <select class="format-select" id="outputFormat">
+                    <option value="pdf">PDF（匯出）</option>
+                    <option value="html">HTML</option>
+                    <option value="markdown" selected>Markdown</option>
+                    <option value="csv">CSV</option>
+                    <option value="tsv">TSV</option>
+                    <option value="json">JSON</option>
+                    <option value="yaml">YAML</option>
+                    <option value="xml">XML</option>
+                    <option value="text">純文字</option>
+                </select>
+            </div>
+            <div class="panel-body">
+                <div class="output-area" id="outputRaw"></div>
+                <div class="html-preview" id="outputPreview" style="display:none"></div>
+            </div>
+            <div class="status-bar">
+                <span><span class="status-dot" id="statusDot"></span><span id="statusText">等待轉換</span></span>
+                <span id="outputStats">0 字元</span>
+            </div>
+            <div class="pdf-notice" id="pdfNotice">PDF 匯出：轉換後點擊「下載」即可取得 PDF 檔案</div>
+        </div>
+    </div>
+</div>
+
+<div class="toast-msg" id="toast"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/marked.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/turndown.js') }}"></script>
+<script src="{{ url_for('static', filename='js/papaparse.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/js-yaml.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pdf.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
+<script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/pdf.worker.min.js') }}";
+
+const $ = id => document.getElementById(id);
+const inputText = $('inputText');
+const inputFormat = $('inputFormat');
+const outputFormat = $('outputFormat');
+const outputRaw = $('outputRaw');
+const outputPreview = $('outputPreview');
+const statusDot = $('statusDot');
+const statusText = $('statusText');
+const dropZone = $('dropZone');
+const fileInput = $('fileInput');
+const fileTag = $('fileTag');
+const pdfNotice = $('pdfNotice');
+const loadingOverlay = $('loadingOverlay');
+
+let currentOutput = '';
+
+function toast(msg) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+inputText.addEventListener('input', () => {
+    const v = inputText.value;
+    $('inputStats').textContent = `${v.length} 字元 · ${v ? v.split('\n').length : 0} 行`;
+});
+
+outputFormat.addEventListener('change', () => {
+    pdfNotice.classList.toggle('show', outputFormat.value === 'pdf');
+});
+
+inputFormat.addEventListener('change', () => {
+    if (inputFormat.value === 'pdf') {
+        inputText.placeholder = 'PDF 檔案請用上方拖放或點擊上傳\n\n上傳後文字會自動提取並顯示在這裡';
+    } else {
+        inputText.placeholder = '在這裡貼上內容，或透過上方拖放檔案...';
+    }
+    autoSuggestOutput();
+});
+
+function autoSuggestOutput() {
+    const inF = inputFormat.value;
+    const suggestions = {
+        pdf:'markdown', markdown:'html', html:'markdown', csv:'json', tsv:'json',
+        json:'yaml', yaml:'json', xml:'json', text:'markdown'
+    };
+    if (suggestions[inF] && outputFormat.value === inF) {
+        outputFormat.value = suggestions[inF];
+        pdfNotice.classList.toggle('show', outputFormat.value === 'pdf');
+    }
+}
+
+const extMap = {
+    'md':'markdown','markdown':'markdown',
+    'html':'html','htm':'html',
+    'csv':'csv','tsv':'tsv',
+    'json':'json',
+    'yaml':'yaml','yml':'yaml',
+    'xml':'xml',
+    'txt':'text',
+    'pdf':'pdf'
+};
+
+async function extractPdfText(arrayBuffer) {
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    const totalPages = pdf.numPages;
+    let fullText = '';
+    for (let i = 1; i <= totalPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        const lines = [];
+        let lastY = null;
+        for (const item of content.items) {
+            if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) lines.push('\n');
+            lines.push(item.str);
+            lastY = item.transform[5];
+        }
+        if (i > 1) fullText += '\n\n';
+        fullText += lines.join('');
+    }
+    $('pdfPageInfo').textContent = `${totalPages} 頁`;
+    return { text: fullText, pages: totalPages };
+}
+
+async function handleFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    const fmt = extMap[ext] || 'text';
+    inputFormat.value = fmt;
+    autoSuggestOutput();
+    fileTag.innerHTML = `<span class="file-tag"><i data-lucide="file" class="w-3 h-3"></i> ${file.name} <span class="close" onclick="clearFile()">×</span></span>`;
+    lucide.createIcons();
+
+    if (fmt === 'pdf') {
+        loadingOverlay.classList.add('show');
+        statusDot.className = 'status-dot loading';
+        statusText.textContent = '正在解析 PDF...';
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await extractPdfText(arrayBuffer);
+            inputText.value = result.text;
+            inputText.dispatchEvent(new Event('input'));
+            statusDot.className = 'status-dot success';
+            statusText.textContent = `PDF 解析完成（${result.pages} 頁）`;
+            toast(`PDF 解析完成：${result.pages} 頁`);
+        } catch (err) {
+            statusDot.className = 'status-dot error';
+            statusText.textContent = `PDF 解析失敗：${err.message}`;
+            toast('PDF 解析失敗');
+        } finally {
+            loadingOverlay.classList.remove('show');
+        }
+    } else {
+        const reader = new FileReader();
+        reader.onload = e => {
+            inputText.value = e.target.result;
+            inputText.dispatchEvent(new Event('input'));
+        };
+        reader.readAsText(file, 'UTF-8');
+    }
+}
+
+function clearFile() {
+    fileTag.innerHTML = '';
+    fileInput.value = '';
+    $('pdfPageInfo').textContent = '';
+}
+
+fileInput.addEventListener('change', e => {
+    if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+
+document.querySelectorAll('.output-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.output-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        if (tab.dataset.tab === 'raw') {
+            outputRaw.style.display = '';
+            outputPreview.style.display = 'none';
+        } else {
+            outputRaw.style.display = 'none';
+            outputPreview.style.display = '';
+            renderPreview();
+        }
+    });
+});
+
+function renderPreview() {
+    const fmt = outputFormat.value;
+    if (fmt === 'html') {
+        outputPreview.innerHTML = currentOutput;
+    } else if (fmt === 'markdown') {
+        outputPreview.innerHTML = marked.parse(currentOutput);
+    } else if (fmt === 'csv' || fmt === 'tsv') {
+        const parsed = Papa.parse(currentOutput, { header: true });
+        if (parsed.data.length) {
+            const cols = Object.keys(parsed.data[0]);
+            let html = '<table><thead><tr>' + cols.map(c => `<th>${esc(c)}</th>`).join('') + '</tr></thead><tbody>';
+            parsed.data.forEach(row => {
+                html += '<tr>' + cols.map(c => `<td>${esc(row[c]||'')}</td>`).join('') + '</tr>';
+            });
+            html += '</tbody></table>';
+            outputPreview.innerHTML = html;
+        } else {
+            outputPreview.textContent = currentOutput;
+        }
+    } else if (fmt === 'pdf') {
+        outputPreview.innerHTML = '<div style="padding:1rem;">' + currentOutput + '</div>';
+    } else {
+        outputPreview.innerHTML = `<pre><code>${esc(currentOutput)}</code></pre>`;
+    }
+}
+
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ============ CONVERTERS ============
+function parseInput(text, fmt) {
+    switch(fmt) {
+        case 'pdf': return { type:'text', data: text };
+        case 'markdown': return { type:'markup', data: marked.parse(text), raw: text };
+        case 'html': return { type:'markup', data: text, raw: text };
+        case 'csv': return { type:'table', data: Papa.parse(text, { header:true, skipEmptyLines:true }) };
+        case 'tsv': return { type:'table', data: Papa.parse(text, { header:true, delimiter:'\t', skipEmptyLines:true }) };
+        case 'json': {
+            const obj = JSON.parse(text);
+            if (Array.isArray(obj) && obj.length && typeof obj[0] === 'object') {
+                return { type:'table', data: { data: obj, meta: { fields: Object.keys(obj[0]) } } };
+            }
+            return { type:'data', data: obj };
+        }
+        case 'yaml': {
+            const obj = jsyaml.load(text);
+            if (Array.isArray(obj) && obj.length && typeof obj[0] === 'object') {
+                return { type:'table', data: { data: obj, meta: { fields: Object.keys(obj[0]) } } };
+            }
+            return { type:'data', data: obj };
+        }
+        case 'xml': return { type:'markup', data: text, raw: text };
+        case 'text': return { type:'text', data: text };
+        default: return { type:'text', data: text };
+    }
+}
+
+function convertToOutput(parsed, outFmt, inFmt) {
+    if (outFmt === 'pdf') {
+        if (parsed.type === 'markup') return inFmt === 'markdown' ? parsed.data : parsed.raw;
+        if (parsed.type === 'table') {
+            const rows = parsed.data.data;
+            const fields = parsed.data.meta?.fields || (rows.length ? Object.keys(rows[0]) : []);
+            let h = '<table style="border-collapse:collapse;width:100%"><thead><tr>' +
+                fields.map(f=>`<th style="border:1px solid #ccc;padding:6px 10px;background:#f0f0f0;text-align:left">${esc(f)}</th>`).join('') +
+                '</tr></thead><tbody>';
+            rows.forEach(r => {
+                h += '<tr>' + fields.map(f=>`<td style="border:1px solid #ccc;padding:6px 10px">${esc(String(r[f]??''))}</td>`).join('') + '</tr>';
+            });
+            h += '</tbody></table>';
+            return h;
+        }
+        if (parsed.type === 'data') return '<pre style="background:#f5f5f5;padding:12px;border-radius:6px;font-size:12px">' + esc(JSON.stringify(parsed.data, null, 2)) + '</pre>';
+        return parsed.data.split('\n').filter(l=>l.trim()).map(l => `<p>${esc(l)}</p>`).join('\n');
+    }
+    if (parsed.type === 'markup') {
+        if (outFmt === 'html') return inFmt === 'markdown' ? parsed.data : parsed.raw;
+        if (outFmt === 'markdown') {
+            if (inFmt === 'html' || inFmt === 'markdown') {
+                const td = new TurndownService({ headingStyle:'atx', codeBlockStyle:'fenced' });
+                return inFmt === 'html' ? td.turndown(parsed.raw) : parsed.raw;
+            }
+        }
+        if (outFmt === 'text') {
+            const tmp = document.createElement('div');
+            tmp.innerHTML = parsed.data;
+            return tmp.textContent || tmp.innerText;
+        }
+    }
+    if (parsed.type === 'table') {
+        const rows = parsed.data.data;
+        const fields = parsed.data.meta?.fields || (rows.length ? Object.keys(rows[0]) : []);
+        switch(outFmt) {
+            case 'csv': return Papa.unparse(rows);
+            case 'tsv': return Papa.unparse(rows, { delimiter:'\t' });
+            case 'json': return JSON.stringify(rows, null, 2);
+            case 'yaml': return jsyaml.dump(rows, { lineWidth:-1 });
+            case 'markdown': {
+                if (!fields.length) return '';
+                let md = '| ' + fields.join(' | ') + ' |\n';
+                md += '| ' + fields.map(() => '---').join(' | ') + ' |\n';
+                rows.forEach(r => { md += '| ' + fields.map(f => r[f]??'').join(' | ') + ' |\n'; });
+                return md;
+            }
+            case 'html': {
+                let h = '<table>\n<thead><tr>' + fields.map(f=>`<th>${esc(f)}</th>`).join('') + '</tr></thead>\n<tbody>\n';
+                rows.forEach(r => { h += '<tr>' + fields.map(f=>`<td>${esc(String(r[f]??''))}</td>`).join('') + '</tr>\n'; });
+                h += '</tbody>\n</table>';
+                return h;
+            }
+            case 'xml': {
+                let x = '<?xml version="1.0" encoding="UTF-8"?>\n<records>\n';
+                rows.forEach(r => {
+                    x += '  <record>\n';
+                    fields.forEach(f => { x += `    <${sanitizeTag(f)}>${esc(String(r[f]??''))}</${sanitizeTag(f)}>\n`; });
+                    x += '  </record>\n';
+                });
+                x += '</records>';
+                return x;
+            }
+            case 'text': return rows.map(r => fields.map(f => `${f}: ${r[f]??''}`).join('\n')).join('\n---\n');
+        }
+    }
+    if (parsed.type === 'data') {
+        switch(outFmt) {
+            case 'json': return JSON.stringify(parsed.data, null, 2);
+            case 'yaml': return jsyaml.dump(parsed.data, { lineWidth:-1 });
+            case 'xml': return jsonToXml(parsed.data);
+            case 'text': return JSON.stringify(parsed.data, null, 2);
+            case 'markdown': return '```json\n' + JSON.stringify(parsed.data, null, 2) + '\n```';
+            case 'html': return '<pre><code>' + esc(JSON.stringify(parsed.data, null, 2)) + '</code></pre>';
+            default: return JSON.stringify(parsed.data, null, 2);
+        }
+    }
+    if (parsed.type === 'text') {
+        switch(outFmt) {
+            case 'text': return parsed.data;
+            case 'markdown': return parsed.data;
+            case 'html': return parsed.data.split('\n').map(l => `<p>${esc(l)}</p>`).join('\n');
+            case 'json': return JSON.stringify({ content: parsed.data }, null, 2);
+            case 'yaml': return jsyaml.dump({ content: parsed.data });
+            default: return parsed.data;
+        }
+    }
+    return String(parsed.data || parsed.raw || '');
+}
+
+function sanitizeTag(s) { return s.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_').replace(/^(\d)/, '_$1') || 'field'; }
+
+function jsonToXml(obj, indent='') {
+    if (obj === null || obj === undefined) return indent + '<null/>\n';
+    if (typeof obj !== 'object') return indent + esc(String(obj));
+    let x = '';
+    if (Array.isArray(obj)) {
+        x += indent + '<array>\n';
+        obj.forEach(item => { x += indent + '  <item>\n' + jsonToXml(item, indent+'    ') + '\n' + indent + '  </item>\n'; });
+        x += indent + '</array>\n';
+    } else {
+        for (const [k,v] of Object.entries(obj)) {
+            const tag = sanitizeTag(k);
+            if (typeof v === 'object' && v !== null) {
+                x += indent + `<${tag}>\n` + jsonToXml(v, indent+'  ') + indent + `</${tag}>\n`;
+            } else {
+                x += indent + `<${tag}>${esc(String(v??''))}</${tag}>\n`;
+            }
+        }
+    }
+    return x;
+}
+
+// ============ PDF EXPORT ============
+async function exportToPdf(htmlContent) {
+    const container = document.createElement('div');
+    container.style.cssText = 'font-family: "Noto Sans TC", sans-serif; font-size: 14px; line-height: 1.8; color: #1a1a1a; padding: 0; max-width: 100%;';
+    container.innerHTML = htmlContent;
+    container.querySelectorAll('table').forEach(t => { t.style.cssText = 'border-collapse: collapse; width: 100%; margin: 1em 0;'; });
+    container.querySelectorAll('th, td').forEach(cell => { cell.style.cssText = 'border: 1px solid #ccc; padding: 6px 10px; text-align: left;'; });
+    container.querySelectorAll('th').forEach(th => { th.style.background = '#f0f0f0'; });
+    container.querySelectorAll('pre').forEach(pre => { pre.style.cssText = 'background: #f5f5f5; padding: 12px; border-radius: 6px; overflow-x: auto; font-size: 12px;'; });
+    container.querySelectorAll('h1,h2,h3').forEach(h => { h.style.cssText = 'margin: 1em 0 0.5em; color: #2563eb;'; });
+    await html2pdf().set({
+        margin: [15, 15, 15, 15],
+        filename: 'converted.pdf',
+        image: { type: 'jpeg', quality: 0.95 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(container).save();
+}
+
+// ============ MAIN ============
+$('convertBtn').addEventListener('click', () => {
+    const text = inputText.value.trim();
+    if (!text) { toast('請先輸入或上傳內容'); return; }
+    const inFmt = inputFormat.value;
+    const outFmt = outputFormat.value;
+    try {
+        const parsed = parseInput(text, inFmt);
+        currentOutput = convertToOutput(parsed, outFmt, inFmt);
+        if (outFmt === 'pdf') {
+            outputRaw.textContent = '[ PDF 模式 — 點擊「下載」匯出 ]\n\n' +
+                currentOutput.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').substring(0, 500) + '...';
+        } else {
+            outputRaw.textContent = currentOutput;
+        }
+        $('outputStats').textContent = outFmt === 'pdf' ? 'PDF' : `${currentOutput.length} 字元`;
+        statusDot.className = 'status-dot success';
+        statusText.textContent = `${inFmt.toUpperCase()} → ${outFmt.toUpperCase()} 完成`;
+        pdfNotice.classList.toggle('show', outFmt === 'pdf');
+        const activeTab = document.querySelector('.output-tab.active');
+        if (activeTab && activeTab.dataset.tab === 'preview') renderPreview();
+        toast('轉換成功 ✓');
+    } catch(err) {
+        statusDot.className = 'status-dot error';
+        statusText.textContent = `轉換失敗：${err.message}`;
+        outputRaw.textContent = `錯誤：${err.message}\n\n提示：請確認輸入格式選擇正確。`;
+        toast('轉換失敗 ✕');
+    }
+});
+
+$('swapBtn').addEventListener('click', () => {
+    if (outputFormat.value === 'pdf' || inputFormat.value === 'pdf') { toast('PDF 格式無法交換'); return; }
+    const tmp = inputFormat.value;
+    inputFormat.value = outputFormat.value;
+    outputFormat.value = tmp;
+    if (currentOutput) { inputText.value = currentOutput; inputText.dispatchEvent(new Event('input')); }
+    pdfNotice.classList.toggle('show', outputFormat.value === 'pdf');
+    toast('已交換格式');
+});
+
+$('copyBtn').addEventListener('click', () => {
+    if (!currentOutput) { toast('尚無輸出結果'); return; }
+    if (outputFormat.value === 'pdf') { toast('PDF 格式請用下載按鈕'); return; }
+    navigator.clipboard.writeText(currentOutput).then(() => toast('已複製到剪貼簿'));
+});
+
+$('downloadBtn').addEventListener('click', async () => {
+    if (!currentOutput) { toast('尚無輸出結果'); return; }
+    if (outputFormat.value === 'pdf') {
+        statusDot.className = 'status-dot loading';
+        statusText.textContent = '正在產生 PDF...';
+        toast('正在產生 PDF...');
+        try {
+            await exportToPdf(currentOutput);
+            statusDot.className = 'status-dot success';
+            statusText.textContent = 'PDF 匯出完成';
+            toast('PDF 已下載 ✓');
+        } catch(err) {
+            statusDot.className = 'status-dot error';
+            statusText.textContent = `PDF 匯出失敗：${err.message}`;
+            toast('PDF 匯出失敗');
+        }
+        return;
+    }
+    const extLookup = { markdown:'.md', html:'.html', csv:'.csv', tsv:'.tsv', json:'.json', yaml:'.yaml', xml:'.xml', text:'.txt' };
+    const ext = extLookup[outputFormat.value] || '.txt';
+    const blob = new Blob([currentOutput], { type:'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `converted${ext}`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    toast('檔案已下載');
+});
+
+$('clearBtn').addEventListener('click', () => {
+    inputText.value = '';
+    currentOutput = '';
+    outputRaw.textContent = '';
+    outputPreview.innerHTML = '';
+    statusDot.className = 'status-dot';
+    statusText.textContent = '等待轉換';
+    $('inputStats').textContent = '0 字元 · 0 行';
+    $('outputStats').textContent = '0 字元';
+    $('pdfPageInfo').textContent = '';
+    pdfNotice.classList.remove('show');
+    clearFile();
+    toast('已清除');
+});
+
+lucide.createIcons();
+</script>
+{% endblock %}

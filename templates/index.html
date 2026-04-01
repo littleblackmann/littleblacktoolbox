@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}小黑工具箱 — 你的私人效率神器{% endblock %}
+{% block nav_home %}active{% endblock %}
+
+{% block extra_css %}
+/* 首頁 Hero */
+.hero-title {
+    font-size: clamp(2rem, 5vw, 3.5rem);
+    font-weight: 900;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+}
+
+.hero-gradient {
+    background: linear-gradient(135deg, #60a5fa, #a78bfa, #38bdf8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* 工具卡片 */
+.tool-card {
+    background: rgba(17, 24, 39, 0.5);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-radius: 20px;
+    padding: 2rem;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.tool-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 20px;
+    padding: 1px;
+    background: linear-gradient(135deg, transparent 40%, var(--card-accent, rgba(59,130,246,0.3)));
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    opacity: 0;
+    transition: opacity 0.35s;
+}
+
+.tool-card:hover::before {
+    opacity: 1;
+}
+
+.tool-card:hover {
+    transform: translateY(-4px);
+    border-color: transparent;
+    box-shadow: 0 20px 60px -15px var(--card-shadow, rgba(59,130,246,0.15));
+}
+
+.tool-card:active {
+    transform: translateY(-2px) scale(0.99);
+}
+
+.tool-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 1.25rem;
+    position: relative;
+}
+
+.tool-icon::after {
+    content: '';
+    position: absolute;
+    inset: -4px;
+    border-radius: 20px;
+    background: inherit;
+    opacity: 0.15;
+    filter: blur(12px);
+}
+
+.tool-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.tool-arrow {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.03);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateX(-8px);
+    transition: all 0.35s;
+}
+
+.tool-card:hover .tool-arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* 統計條 */
+.stat-bar {
+    background: rgba(17, 24, 39, 0.4);
+    border: 1px solid rgba(30, 41, 59, 0.4);
+    border-radius: 14px;
+    padding: 1rem 1.5rem;
+}
+
+/* 即將推出提示 */
+.coming-soon {
+    border: 1px dashed rgba(71, 85, 105, 0.5);
+    border-radius: 20px;
+    padding: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    color: #475569;
+    transition: all 0.3s;
+}
+
+.coming-soon:hover {
+    border-color: rgba(71, 85, 105, 0.8);
+    color: #64748b;
+}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <!-- Hero 區域 -->
+    <div class="text-center mb-16 animate-in">
+        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-sm font-medium mb-6">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            完全離線 &bull; 隱私安全 &bull; 一鍵啟動
+        </div>
+        <h1 class="hero-title mb-4">
+            <span class="text-slate-200">小黑的</span><br>
+            <span class="hero-gradient">私人工具箱</span>
+        </h1>
+        <p class="text-slate-400 text-lg max-w-xl mx-auto leading-relaxed">
+            所有好用工具集中在這裡。不需要網路、不會上傳你的檔案，<br class="hidden sm:inline">
+            打開就用，用完就關。
+        </p>
+    </div>
+
+    <!-- 工具卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 mb-12">
+
+        <!-- AI 去背工具 -->
+        <a href="/tool/bg-remover" class="tool-card animate-in animate-delay-1"
+           style="--card-accent: rgba(168,85,247,0.4); --card-shadow: rgba(168,85,247,0.15);">
+            <div class="tool-arrow">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="tool-icon bg-gradient-to-br from-purple-500 to-pink-500">
+                <i data-lucide="eraser" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+                <h3 class="text-lg font-bold text-slate-100">AI 智慧去背</h3>
+                <span class="tool-tag bg-purple-500/15 text-purple-400">AI</span>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">
+                使用深度學習模型，一鍵去除圖片背景。精準度媲美線上 AI 去背服務，完全離線運作。
+            </p>
+            <div class="flex items-center gap-4 mt-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="cpu" class="w-3 h-3"></i> BiRefNet 模型</span>
+                <span class="flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3"></i> 本地推理</span>
+            </div>
+        </a>
+
+        <!-- PNG 轉 ICO -->
+        <a href="/tool/png-to-ico" class="tool-card animate-in animate-delay-2"
+           style="--card-accent: rgba(59,130,246,0.4); --card-shadow: rgba(59,130,246,0.15);">
+            <div class="tool-arrow">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="tool-icon bg-gradient-to-br from-blue-500 to-cyan-400">
+                <i data-lucide="layers" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+                <h3 class="text-lg font-bold text-slate-100">PNG 轉 ICO</h3>
+                <span class="tool-tag bg-blue-500/15 text-blue-400">圖片</span>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">
+                上傳 PNG 圖片，自動打包包含 16x16 到 256x256 的全尺寸標準圖示檔。
+            </p>
+            <div class="flex items-center gap-4 mt-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="package" class="w-3 h-3"></i> 6 種尺寸</span>
+                <span class="flex items-center gap-1"><i data-lucide="download" class="w-3 h-3"></i> 即時下載</span>
+            </div>
+        </a>
+
+        <!-- 文字轉檔 -->
+        <a href="/tool/text-converter" class="tool-card animate-in animate-delay-3"
+           style="--card-accent: rgba(52,211,153,0.4); --card-shadow: rgba(52,211,153,0.15);">
+            <div class="tool-arrow">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="tool-icon bg-gradient-to-br from-emerald-500 to-teal-400">
+                <i data-lucide="file-text" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+                <h3 class="text-lg font-bold text-slate-100">文字轉檔工坊</h3>
+                <span class="tool-tag bg-emerald-500/15 text-emerald-400">文件</span>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">
+                支援 Markdown、JSON、CSV、YAML、HTML 等多種格式的文字檔案互轉。
+            </p>
+            <div class="flex items-center gap-4 mt-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="repeat" class="w-3 h-3"></i> 雙向轉換</span>
+                <span class="flex items-center gap-1"><i data-lucide="file-code" class="w-3 h-3"></i> 多種格式</span>
+            </div>
+        </a>
+
+        <!-- QR Code 生成器 -->
+        <a href="/tool/qrcode" class="tool-card animate-in"
+           style="--card-accent: rgba(245,158,11,0.4); --card-shadow: rgba(245,158,11,0.15); animation-delay: 0.4s; opacity: 0;">
+            <div class="tool-arrow">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="tool-icon bg-gradient-to-br from-amber-500 to-orange-500">
+                <i data-lucide="qr-code" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+                <h3 class="text-lg font-bold text-slate-100">QR Code 生成器</h3>
+                <span class="tool-tag bg-amber-500/15 text-amber-400">實用</span>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">
+                輸入任何網址、文字或電話號碼，即時產生高品質 QR Code。
+            </p>
+            <div class="flex items-center gap-4 mt-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="zap" class="w-3 h-3"></i> 即時生成</span>
+                <span class="flex items-center gap-1"><i data-lucide="palette" class="w-3 h-3"></i> 自訂顏色</span>
+            </div>
+        </a>
+
+        <!-- OCR 文字辨識 -->
+        <a href="/tool/ocr" class="tool-card animate-in"
+           style="--card-accent: rgba(14,165,233,0.4); --card-shadow: rgba(14,165,233,0.15); animation-delay: 0.5s; opacity: 0;">
+            <div class="tool-arrow">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-slate-400"></i>
+            </div>
+            <div class="tool-icon bg-gradient-to-br from-sky-500 to-indigo-500">
+                <i data-lucide="scan-text" class="w-6 h-6 text-white"></i>
+            </div>
+            <div class="flex items-center gap-2 mb-2">
+                <h3 class="text-lg font-bold text-slate-100">OCR 文字辨識</h3>
+                <span class="tool-tag bg-sky-500/15 text-sky-400">AI</span>
+            </div>
+            <p class="text-sm text-slate-400 leading-relaxed">
+                上傳圖片或貼上截圖，AI 自動辨識圖中文字。支援中、英、日、韓等多國語言。
+            </p>
+            <div class="flex items-center gap-4 mt-4 text-xs text-slate-500">
+                <span class="flex items-center gap-1"><i data-lucide="brain" class="w-3 h-3"></i> EasyOCR 引擎</span>
+                <span class="flex items-center gap-1"><i data-lucide="languages" class="w-3 h-3"></i> 多國語言</span>
+            </div>
+        </a>
+
+    </div>
+
+    <!-- 即將推出區域 -->
+    <div class="mb-8">
+        <h2 class="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <i data-lucide="clock" class="w-4 h-4"></i> 更多工具即將推出
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div class="coming-soon">
+                <i data-lucide="plus-circle" class="w-8 h-8 mb-2 opacity-40"></i>
+                <span class="text-sm font-medium">新工具開發中...</span>
+                <span class="text-xs mt-1 opacity-60">想到什麼好工具隨時可以加</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部資訊列 -->
+    <div class="stat-bar flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+        <div class="flex items-center gap-6 text-slate-400">
+            <span class="flex items-center gap-1.5">
+                <i data-lucide="wrench" class="w-4 h-4 text-blue-400"></i>
+                <strong class="text-slate-200">5</strong> 個工具
+            </span>
+            <span class="flex items-center gap-1.5">
+                <i data-lucide="shield-check" class="w-4 h-4 text-emerald-400"></i>
+                100% 離線
+            </span>
+            <span class="flex items-center gap-1.5">
+                <i data-lucide="lock" class="w-4 h-4 text-amber-400"></i>
+                零資料外洩
+            </span>
+        </div>
+        <div class="text-slate-500 text-xs">
+            小黑專屬打造 &bull; 持續更新中
+        </div>
+    </div>
+
+</div>
+{% endblock %}

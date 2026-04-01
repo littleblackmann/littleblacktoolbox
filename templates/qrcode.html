@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block title %}QR Code 生成器 — 小黑工具箱{% endblock %}
+{% block nav_qr %}active{% endblock %}
+
+{% block extra_css %}
+.input-area {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-radius: 12px;
+    padding: 1rem;
+    width: 100%;
+    color: #f1f5f9;
+    font-size: 0.95rem;
+    resize: vertical;
+    min-height: 100px;
+    transition: border-color 0.2s;
+    font-family: inherit;
+}
+
+.input-area:focus {
+    outline: none;
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+}
+
+.input-area::placeholder {
+    color: #475569;
+}
+
+.qr-preview {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 280px;
+    transition: all 0.3s;
+}
+
+.qr-preview.empty {
+    background: rgba(15, 23, 42, 0.4);
+    border: 2px dashed rgba(71, 85, 105, 0.4);
+}
+
+/* 快捷模板按鈕 */
+.template-btn {
+    padding: 0.4rem 0.8rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    background: rgba(17, 24, 39, 0.5);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.template-btn:hover {
+    border-color: rgba(245, 158, 11, 0.4);
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.05);
+}
+
+/* 尺寸選擇 */
+.size-option {
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    background: rgba(17, 24, 39, 0.5);
+    color: #94a3b8;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.size-option:hover {
+    border-color: rgba(245, 158, 11, 0.3);
+    color: #e2e8f0;
+}
+
+.size-option.active {
+    border-color: rgba(245, 158, 11, 0.6);
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.1);
+}
+
+/* 顏色選擇器 */
+.color-picker-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-picker-wrapper input[type="color"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 36px;
+    height: 36px;
+    border: 2px solid rgba(30, 41, 59, 0.6);
+    border-radius: 8px;
+    cursor: pointer;
+    background: none;
+    padding: 2px;
+}
+
+.color-picker-wrapper input[type="color"]::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker-wrapper input[type="color"]::-webkit-color-swatch {
+    border: none;
+    border-radius: 4px;
+}
+
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* 字數統計 */
+.char-count {
+    font-size: 0.7rem;
+    color: #475569;
+    text-align: right;
+    margin-top: 4px;
+    transition: color 0.2s;
+}
+
+.char-count.warning { color: #f59e0b; }
+.char-count.danger { color: #ef4444; }
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 頁面標題 -->
+    <div class="mb-8 animate-in">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+                <i data-lucide="qr-code" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-100">QR Code 生成器</h1>
+                <p class="text-sm text-slate-400">輸入任何文字或網址，即時產生 QR Code</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要內容區 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- 左側：輸入區 -->
+        <div class="flex flex-col gap-4 animate-in animate-delay-1">
+            <div class="glass p-6">
+                <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                    <i data-lucide="pencil" class="w-4 h-4 text-amber-400"></i>
+                    輸入內容
+                </h2>
+
+                <!-- 快捷模板 -->
+                <div class="flex flex-wrap gap-2 mb-3">
+                    <button class="template-btn" onclick="setTemplate('url')">
+                        <i data-lucide="globe" class="w-3 h-3"></i> 網址
+                    </button>
+                    <button class="template-btn" onclick="setTemplate('tel')">
+                        <i data-lucide="phone" class="w-3 h-3"></i> 電話
+                    </button>
+                    <button class="template-btn" onclick="setTemplate('email')">
+                        <i data-lucide="mail" class="w-3 h-3"></i> Email
+                    </button>
+<button class="template-btn" onclick="setTemplate('text')">
+                        <i data-lucide="type" class="w-3 h-3"></i> 純文字
+                    </button>
+                </div>
+
+                <!-- 輸入框 -->
+                <textarea id="qrInput" class="input-area" placeholder="輸入網址、文字、電話號碼..." oninput="onInputChange()"></textarea>
+                <div id="charCount" class="char-count">0 / 2953 字元</div>
+
+                <!-- 自訂選項 -->
+                <div class="mt-5">
+                    <h3 class="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                        <i data-lucide="settings" class="w-3.5 h-3.5 text-slate-400"></i>
+                        自訂選項
+                    </h3>
+
+                    <!-- 尺寸 -->
+                    <div class="mb-4">
+                        <label class="text-xs text-slate-400 mb-2 block">圖片尺寸</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="size-option" data-size="200" onclick="setSize(200, this)">200px</button>
+                            <button class="size-option active" data-size="300" onclick="setSize(300, this)">300px</button>
+                            <button class="size-option" data-size="500" onclick="setSize(500, this)">500px</button>
+                            <button class="size-option" data-size="800" onclick="setSize(800, this)">800px</button>
+                            <button class="size-option" data-size="1024" onclick="setSize(1024, this)">1024px</button>
+                        </div>
+                    </div>
+
+                    <!-- 顏色 -->
+                    <div class="flex gap-6">
+                        <div>
+                            <label class="text-xs text-slate-400 mb-2 block">QR Code 顏色</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="fgColor" value="#000000" onchange="onInputChange()">
+                                <span class="text-xs text-slate-500" id="fgColorLabel">#000000</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-xs text-slate-400 mb-2 block">背景顏色</label>
+                            <div class="color-picker-wrapper">
+                                <input type="color" id="bgColor" value="#FFFFFF" onchange="onInputChange()">
+                                <span class="text-xs text-slate-500" id="bgColorLabel">#FFFFFF</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 生成按鈕 -->
+                <button id="generateBtn" class="btn-primary w-full justify-center mt-5"
+                        style="background: linear-gradient(135deg, #f59e0b, #d97706); box-shadow: 0 4px 20px rgba(245,158,11,0.25);"
+                        onclick="generateQR()" disabled>
+                    <i data-lucide="qr-code" class="w-5 h-5"></i>
+                    生成 QR Code
+                </button>
+
+                <!-- 提示資訊 -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="quality-badge bg-amber-500/10 text-amber-400">
+                        <i data-lucide="zap" class="w-3 h-3"></i> 即時生成
+                    </span>
+                    <span class="quality-badge bg-blue-500/10 text-blue-400">
+                        <i data-lucide="wifi-off" class="w-3 h-3"></i> 100% 離線
+                    </span>
+                    <span class="quality-badge bg-emerald-500/10 text-emerald-400">
+                        <i data-lucide="shield-check" class="w-3 h-3"></i> 隱私安全
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：預覽區 -->
+        <div class="flex flex-col gap-4 animate-in animate-delay-2">
+            <div class="glass p-6">
+                <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                    <i data-lucide="scan" class="w-4 h-4 text-amber-400"></i>
+                    QR Code 預覽
+                </h2>
+
+                <!-- QR Code 顯示區 -->
+                <div id="qrPreview" class="qr-preview empty">
+                    <div id="emptyState" class="flex flex-col items-center text-slate-500">
+                        <i data-lucide="qr-code" class="w-16 h-16 mb-4 opacity-20"></i>
+                        <p class="font-medium text-sm">輸入內容後點擊生成</p>
+                        <p class="text-xs mt-1 opacity-60">支援網址、文字、電話、Wi-Fi 等</p>
+                    </div>
+                    <div id="qrOutput" class="hidden"></div>
+                </div>
+
+                <!-- 下載按鈕群 -->
+                <div id="downloadBtns" class="hidden mt-4 flex gap-3">
+                    <button class="btn-primary flex-1 justify-center"
+                            style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 20px rgba(16,185,129,0.25);"
+                            onclick="downloadQR('png')">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                        下載 PNG
+                    </button>
+                    <button class="btn-primary justify-center"
+                            style="background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 4px 20px rgba(99,102,241,0.25);"
+                            onclick="copyQR()">
+                        <i data-lucide="clipboard-copy" class="w-5 h-5"></i>
+                        複製
+                    </button>
+                </div>
+
+                <!-- 掃描提示 -->
+                <div id="scanTip" class="hidden mt-4 p-3 rounded-lg bg-amber-500/5 border border-amber-500/20">
+                    <p class="text-xs text-amber-400 flex items-center gap-2">
+                        <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                        用手機相機或掃碼 APP 對準螢幕即可掃描
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
+<script>
+    // ── 全域變數 ──
+    let qrInstance = null;
+    let currentSize = 300;
+
+    // ── DOM ──
+    const qrInput = document.getElementById('qrInput');
+    const qrPreview = document.getElementById('qrPreview');
+    const qrOutput = document.getElementById('qrOutput');
+    const emptyState = document.getElementById('emptyState');
+    const downloadBtns = document.getElementById('downloadBtns');
+    const scanTip = document.getElementById('scanTip');
+    const generateBtn = document.getElementById('generateBtn');
+    const charCount = document.getElementById('charCount');
+    const fgColor = document.getElementById('fgColor');
+    const bgColor = document.getElementById('bgColor');
+    const fgColorLabel = document.getElementById('fgColorLabel');
+    const bgColorLabel = document.getElementById('bgColorLabel');
+
+    // ── 快捷模板 ──
+    function setTemplate(type) {
+        const templates = {
+            url: 'https://',
+            tel: 'tel:+886',
+            email: 'mailto:',
+            text: ''
+        };
+        qrInput.value = templates[type] || '';
+        qrInput.focus();
+        // 將游標移到最後
+        qrInput.setSelectionRange(qrInput.value.length, qrInput.value.length);
+        onInputChange();
+    }
+
+    // ── 輸入變化 ──
+    function onInputChange() {
+        const len = qrInput.value.length;
+        charCount.textContent = `${len} / 2953 字元`;
+        charCount.className = 'char-count' + (len > 2500 ? ' danger' : len > 2000 ? ' warning' : '');
+
+        generateBtn.disabled = len === 0;
+
+        // 更新顏色標籤
+        fgColorLabel.textContent = fgColor.value.toUpperCase();
+        bgColorLabel.textContent = bgColor.value.toUpperCase();
+    }
+
+    // ── 尺寸選擇 ──
+    function setSize(size, btn) {
+        currentSize = size;
+        document.querySelectorAll('.size-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+    }
+
+    // ── 生成 QR Code ──
+    function generateQR() {
+        const text = qrInput.value.trim();
+        if (!text) return;
+
+        // 清除舊的
+        qrOutput.innerHTML = '';
+
+        // 顯示結果區
+        emptyState.classList.add('hidden');
+        qrOutput.classList.remove('hidden');
+        qrPreview.classList.remove('empty');
+        qrPreview.style.background = bgColor.value;
+
+        // 生成新的 QR Code
+        qrInstance = new QRCode(qrOutput, {
+            text: text,
+            width: currentSize,
+            height: currentSize,
+            colorDark: fgColor.value,
+            colorLight: bgColor.value,
+            correctLevel: QRCode.CorrectLevel.H  // 最高容錯
+        });
+
+        // 顯示下載區
+        downloadBtns.classList.remove('hidden');
+        scanTip.classList.remove('hidden');
+
+        lucide.createIcons();
+    }
+
+    // ── 下載 PNG ──
+    function downloadQR(format) {
+        const canvas = qrOutput.querySelector('canvas');
+        if (!canvas) return;
+
+        const link = document.createElement('a');
+        link.download = 'qrcode_' + currentSize + 'px.png';
+        link.href = canvas.toDataURL('image/png');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    // ── 複製到剪貼簿 ──
+    async function copyQR() {
+        const canvas = qrOutput.querySelector('canvas');
+        if (!canvas) return;
+
+        try {
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+            await navigator.clipboard.write([
+                new ClipboardItem({ 'image/png': blob })
+            ]);
+
+            // 複製成功提示
+            const btn = event.target.closest('button');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i> 已複製！';
+            btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';
+            lucide.createIcons();
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.background = 'linear-gradient(135deg, #6366f1, #4f46e5)';
+                lucide.createIcons();
+            }, 2000);
+        } catch (err) {
+            alert('複製失敗，請改用下載方式');
+        }
+    }
+
+    // ── Enter 快捷鍵生成 ──
+    qrInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
+            generateQR();
+        }
+    });
+
+    lucide.createIcons();
+</script>
+{% endblock %}

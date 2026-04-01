@@ -1,0 +1,397 @@
+{% extends "base.html" %}
+
+{% block title %}PNG 轉 ICO — 小黑工具箱{% endblock %}
+{% block nav_ico %}active{% endblock %}
+
+{% block extra_css %}
+.size-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 0.5rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    color: #94a3b8;
+}
+
+.size-chip i { color: #3b82f6; }
+
+.upload-zone {
+    border: 2px dashed rgba(71, 85, 105, 0.5);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    min-height: 280px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.upload-zone:hover, .upload-zone.drag-over {
+    border-color: rgba(59, 130, 246, 0.5);
+    background: rgba(59, 130, 246, 0.03);
+}
+
+.size-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-top: 1rem;
+}
+
+.size-preview-item {
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(30, 41, 59, 0.4);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.size-preview-item .preview-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.size-preview-item span {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: #64748b;
+}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 頁面標題 -->
+    <div class="mb-8 animate-in">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center">
+                <i data-lucide="layers" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-100">PNG 轉 ICO 全尺寸打包</h1>
+                <p class="text-sm text-slate-400">上傳圖片，自動打包 16x16 到 256x256 的標準圖示檔</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- 左側：上傳 & 預覽 -->
+        <div class="glass p-6 animate-in animate-delay-1">
+            <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                <i data-lucide="upload" class="w-4 h-4 text-blue-400"></i>
+                選擇圖片
+            </h2>
+
+            <label for="fileInput" class="upload-zone block" id="uploadZone">
+                <div id="uploadPrompt">
+                    <i data-lucide="image-plus" class="w-14 h-14 text-slate-500 mx-auto mb-4"></i>
+                    <p class="text-slate-300 font-medium mb-1">拖曳圖片到這裡，或點擊選擇</p>
+                    <p class="text-slate-500 text-sm">支援 PNG、JPG、WebP，建議正方形圖片效果最佳</p>
+                </div>
+                <div id="imagePreviewContainer" class="hidden w-full">
+                    <div class="checkerboard rounded-lg p-4 flex items-center justify-center" style="min-height: 220px;">
+                        <img id="imagePreview" class="max-w-full max-h-[250px] object-contain rounded-lg drop-shadow-lg" alt="Preview">
+                    </div>
+                    <p class="text-sm text-slate-400 mt-3" id="imgInfo"></p>
+                </div>
+                <input type="file" id="fileInput" class="hidden" accept="image/png, image/jpeg, image/webp">
+            </label>
+
+            <!-- 尺寸預覽 -->
+            <div id="sizePreviewSection" class="hidden mt-4">
+                <h3 class="text-sm font-medium text-slate-400 mb-2">各尺寸預覽</h3>
+                <div class="size-preview-grid" id="sizePreviewGrid"></div>
+            </div>
+        </div>
+
+        <!-- 右側：設定 & 操作 -->
+        <div class="glass p-6 animate-in animate-delay-2">
+            <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                <i data-lucide="settings-2" class="w-4 h-4 text-cyan-400"></i>
+                包含的解析度
+            </h2>
+
+            <div class="bg-slate-800/30 rounded-xl p-5 border border-slate-700/50">
+                <p class="text-sm text-slate-400 mb-4">轉換後的 ICO 檔將包含以下所有尺寸，確保圖示在任何縮放下都清晰：</p>
+
+                <div class="grid grid-cols-3 gap-3 mb-6">
+                    <div class="size-chip"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 16x16</div>
+                    <div class="size-chip"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 32x32</div>
+                    <div class="size-chip"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 48x48</div>
+                    <div class="size-chip"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 64x64</div>
+                    <div class="size-chip"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 128x128</div>
+                    <div class="size-chip"><i data-lucide="check-circle-2" class="w-4 h-4"></i> 256x256</div>
+                </div>
+
+                <button id="convertBtn" disabled class="btn-primary w-full justify-center text-base"
+                        style="box-shadow: 0 4px 20px rgba(59,130,246,0.25);">
+                    <i data-lucide="package" class="w-5 h-5"></i>
+                    打包並下載 ICO 檔
+                </button>
+
+                <p id="statusMsg" class="text-emerald-400 text-sm mt-3 text-center hidden flex items-center justify-center gap-1">
+                    <i data-lucide="check" class="w-4 h-4"></i> 轉換完成！已開始下載。
+                </p>
+            </div>
+
+            <!-- 使用說明 -->
+            <div class="mt-6 space-y-3">
+                <h3 class="text-sm font-medium text-slate-400 flex items-center gap-2">
+                    <i data-lucide="info" class="w-4 h-4"></i> 使用說明
+                </h3>
+                <div class="space-y-2 text-xs text-slate-500 leading-relaxed">
+                    <p class="flex items-start gap-2">
+                        <i data-lucide="check" class="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0"></i>
+                        ICO 檔案是 Windows 系統使用的標準圖示格式，用於桌面捷徑、資料夾圖示等
+                    </p>
+                    <p class="flex items-start gap-2">
+                        <i data-lucide="check" class="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0"></i>
+                        包含多種尺寸可確保在不同 DPI 設定下都能顯示清晰的圖示
+                    </p>
+                    <p class="flex items-start gap-2">
+                        <i data-lucide="check" class="w-3.5 h-3.5 text-blue-400 mt-0.5 flex-shrink-0"></i>
+                        建議先使用「AI 去背」工具處理圖片，再來轉換 ICO 效果更佳
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const uploadZone = document.getElementById('uploadZone');
+    const uploadPrompt = document.getElementById('uploadPrompt');
+    const imagePreviewContainer = document.getElementById('imagePreviewContainer');
+    const imagePreview = document.getElementById('imagePreview');
+    const convertBtn = document.getElementById('convertBtn');
+    const statusMsg = document.getElementById('statusMsg');
+    const imgInfo = document.getElementById('imgInfo');
+    const sizePreviewSection = document.getElementById('sizePreviewSection');
+    const sizePreviewGrid = document.getElementById('sizePreviewGrid');
+
+    let currentImage = null;
+
+    // 拖曳支援
+    uploadZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        uploadZone.classList.add('drag-over');
+    });
+    uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+    uploadZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        uploadZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            loadImage(file);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) loadImage(e.target.files[0]);
+    });
+
+    function loadImage(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                currentImage = img;
+                imagePreview.src = event.target.result;
+                uploadPrompt.classList.add('hidden');
+                imagePreviewContainer.classList.remove('hidden');
+                convertBtn.disabled = false;
+                statusMsg.classList.add('hidden');
+                imgInfo.textContent = `${img.width} x ${img.height} px · ${(file.size / 1024).toFixed(1)} KB`;
+
+                // 顯示各尺寸預覽
+                generateSizePreviews(img);
+
+                convertBtn.innerHTML = '<i data-lucide="package" class="w-5 h-5"></i> 打包並下載 ICO 檔';
+                lucide.createIcons();
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    function generateSizePreviews(img) {
+        const sizes = [16, 32, 48, 64, 128, 256];
+        sizePreviewGrid.innerHTML = '';
+        sizePreviewSection.classList.remove('hidden');
+
+        sizes.forEach(size => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const scale = Math.min(size / img.width, size / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (size - w) / 2;
+            const y = (size - h) / 2;
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, x, y, w, h);
+
+            const displaySize = Math.min(size, 64);
+            const item = document.createElement('div');
+            item.className = 'size-preview-item';
+            item.innerHTML = `
+                <div class="preview-box checkerboard" style="width:${displaySize + 16}px;height:${displaySize + 16}px;">
+                    <img src="${canvas.toDataURL()}" style="width:${displaySize}px;height:${displaySize}px;image-rendering:pixelated;" alt="${size}x${size}">
+                </div>
+                <span>${size}x${size}</span>
+            `;
+            sizePreviewGrid.appendChild(item);
+        });
+    }
+
+    // Canvas resize + ICO 打包邏輯
+    function getResizedPngBlob(img, size) {
+        return new Promise((resolve) => {
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+
+            const scale = Math.min(size / img.width, size / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            const x = (size - w) / 2;
+            const y = (size - h) / 2;
+
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, x, y, w, h);
+
+            canvas.toBlob((blob) => {
+                resolve({ size, blob });
+            }, 'image/png');
+        });
+    }
+
+    function blobToArrayBuffer(blob) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(blob);
+        });
+    }
+
+    async function createIcoFile(img) {
+        const sizes = [16, 32, 48, 64, 128, 256];
+        const pngDataList = [];
+
+        for (const size of sizes) {
+            const result = await getResizedPngBlob(img, size);
+            const buffer = await blobToArrayBuffer(result.blob);
+            pngDataList.push({ size, buffer });
+        }
+
+        const headerSize = 6;
+        const dirEntrySize = 16;
+        const numImages = sizes.length;
+
+        let totalImageDataSize = 0;
+        for (const item of pngDataList) {
+            totalImageDataSize += item.buffer.byteLength;
+        }
+
+        const totalFileSize = headerSize + (dirEntrySize * numImages) + totalImageDataSize;
+        const icoBuffer = new ArrayBuffer(totalFileSize);
+        const view = new DataView(icoBuffer);
+        const uint8View = new Uint8Array(icoBuffer);
+
+        view.setUint16(0, 0, true);
+        view.setUint16(2, 1, true);
+        view.setUint16(4, numImages, true);
+
+        let dirOffset = headerSize;
+        let dataOffset = headerSize + (dirEntrySize * numImages);
+
+        for (const item of pngDataList) {
+            const width = item.size === 256 ? 0 : item.size;
+            const height = item.size === 256 ? 0 : item.size;
+            const byteLength = item.buffer.byteLength;
+
+            view.setUint8(dirOffset + 0, width);
+            view.setUint8(dirOffset + 1, height);
+            view.setUint8(dirOffset + 2, 0);
+            view.setUint8(dirOffset + 3, 0);
+            view.setUint16(dirOffset + 4, 1, true);
+            view.setUint16(dirOffset + 6, 32, true);
+            view.setUint32(dirOffset + 8, byteLength, true);
+            view.setUint32(dirOffset + 12, dataOffset, true);
+
+            uint8View.set(new Uint8Array(item.buffer), dataOffset);
+
+            dirOffset += dirEntrySize;
+            dataOffset += byteLength;
+        }
+
+        return new Blob([icoBuffer], { type: 'image/x-icon' });
+    }
+
+    // 轉換按鈕
+    convertBtn.addEventListener('click', async () => {
+        if (!currentImage) return;
+
+        convertBtn.disabled = true;
+        convertBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> 處理中...';
+        statusMsg.classList.add('hidden');
+
+        try {
+            const icoBlob = await createIcoFile(currentImage);
+
+            const url = URL.createObjectURL(icoBlob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '小黑_Icon.ico';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            statusMsg.classList.remove('hidden');
+            convertBtn.innerHTML = '<i data-lucide="check-circle" class="w-5 h-5"></i> 下載完成';
+            lucide.createIcons();
+
+            setTimeout(() => {
+                convertBtn.disabled = false;
+                convertBtn.innerHTML = '<i data-lucide="package" class="w-5 h-5"></i> 再次打包下載';
+                lucide.createIcons();
+                statusMsg.classList.add('hidden');
+            }, 3000);
+
+        } catch (error) {
+            console.error("轉換失敗:", error);
+            alert("轉換過程中發生錯誤，請稍後再試。");
+            convertBtn.disabled = false;
+            convertBtn.innerHTML = '<i data-lucide="package" class="w-5 h-5"></i> 打包並下載 ICO 檔';
+            lucide.createIcons();
+        }
+    });
+
+    lucide.createIcons();
+</script>
+{% endblock %}

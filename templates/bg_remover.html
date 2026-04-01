@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}AI 智慧去背 — 小黑工具箱{% endblock %}
+{% block nav_bg %}active{% endblock %}
+
+{% block extra_css %}
+.drop-zone {
+    border: 2px dashed rgba(71, 85, 105, 0.5);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+    border-color: rgba(168, 85, 247, 0.5);
+    background: rgba(168, 85, 247, 0.03);
+}
+
+.drop-zone.drag-over {
+    border-color: rgba(168, 85, 247, 0.8);
+    background: rgba(168, 85, 247, 0.06);
+    transform: scale(1.01);
+}
+
+.preview-panel {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-radius: 16px;
+    overflow: hidden;
+    position: relative;
+}
+
+.preview-label {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.2rem 0.6rem;
+    border-radius: 6px;
+    z-index: 10;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.comparison-slider {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    max-height: 500px;
+    overflow: hidden;
+    border-radius: 12px;
+}
+
+.comparison-slider img {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+
+.comparison-slider .before-img {
+    clip-path: inset(0 0 0 50%);
+}
+
+.comparison-slider .after-img {
+    clip-path: inset(0 50% 0 0);
+}
+
+.comparison-slider .slider-line {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 3px;
+    background: white;
+    z-index: 10;
+    cursor: ew-resize;
+    box-shadow: 0 0 10px rgba(0,0,0,0.5);
+}
+
+.comparison-slider .slider-handle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 40px;
+    height: 40px;
+    background: white;
+    border-radius: 50%;
+    z-index: 11;
+    cursor: ew-resize;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 15px rgba(0,0,0,0.4);
+}
+
+/* 處理進度動畫 */
+.processing-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(6, 8, 13, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 16px;
+    z-index: 20;
+}
+
+.pulse-ring {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: #a855f7;
+    border-right-color: #6366f1;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1.5rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.quality-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0.25rem 0.75rem;
+    border-radius: 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+    <!-- 頁面標題 -->
+    <div class="mb-8 animate-in">
+        <div class="flex items-center gap-3 mb-2">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+                <i data-lucide="eraser" class="w-5 h-5 text-white"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl font-bold text-slate-100">AI 智慧去背</h1>
+                <p class="text-sm text-slate-400">深度學習驅動，離線也能精準去除背景</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主要內容區 -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+        <!-- 左側：上傳區 -->
+        <div class="flex flex-col gap-4 animate-in animate-delay-1">
+            <div class="glass p-6">
+                <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                    <i data-lucide="upload" class="w-4 h-4 text-purple-400"></i>
+                    上傳原始圖片
+                </h2>
+
+                <!-- 拖曳上傳區 -->
+                <div id="dropZone" class="drop-zone" onclick="document.getElementById('fileInput').click()">
+                    <div id="uploadPrompt">
+                        <i data-lucide="image-plus" class="w-14 h-14 text-slate-500 mx-auto mb-4"></i>
+                        <p class="text-slate-300 font-medium mb-1">拖曳圖片到這裡，或點擊選擇</p>
+                        <p class="text-slate-500 text-sm">支援 PNG、JPG、WebP 格式</p>
+                    </div>
+                    <div id="originalPreview" class="hidden w-full">
+                        <div class="preview-panel">
+                            <span class="preview-label bg-slate-700 text-slate-300">原圖</span>
+                            <div class="checkerboard p-4 flex items-center justify-center" style="min-height: 250px;">
+                                <img id="originalImg" class="max-w-full max-h-[300px] object-contain rounded-lg" alt="原始圖片">
+                            </div>
+                        </div>
+                    </div>
+                    <input type="file" id="fileInput" class="hidden" accept="image/png,image/jpeg,image/webp">
+                </div>
+
+                <!-- 操作按鈕 -->
+                <div class="flex gap-3 mt-4">
+                    <button id="removeBtn" disabled class="btn-primary flex-1 justify-center"
+                            style="background: linear-gradient(135deg, #a855f7, #6366f1); box-shadow: 0 4px 20px rgba(168,85,247,0.25);"
+                            onclick="processImage()">
+                        <i data-lucide="wand-2" class="w-5 h-5"></i>
+                        開始去背
+                    </button>
+                    <button id="downloadBtn" disabled class="btn-primary justify-center"
+                            style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 20px rgba(16,185,129,0.25);"
+                            onclick="downloadResult()">
+                        <i data-lucide="download" class="w-5 h-5"></i>
+                        下載
+                    </button>
+                </div>
+
+                <!-- 提示資訊 -->
+                <div class="mt-4 flex flex-wrap gap-2">
+                    <span class="quality-badge bg-purple-500/10 text-purple-400">
+                        <i data-lucide="cpu" class="w-3 h-3"></i> BiRefNet 深度學習
+                    </span>
+                    <span class="quality-badge bg-blue-500/10 text-blue-400">
+                        <i data-lucide="wifi-off" class="w-3 h-3"></i> 100% 離線
+                    </span>
+                    <span class="quality-badge bg-emerald-500/10 text-emerald-400">
+                        <i data-lucide="shield-check" class="w-3 h-3"></i> 隱私安全
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右側：結果區 -->
+        <div class="flex flex-col gap-4 animate-in animate-delay-2">
+            <div class="glass p-6 relative" id="resultPanel">
+                <h2 class="text-base font-semibold text-slate-200 mb-4 flex items-center gap-2">
+                    <i data-lucide="image" class="w-4 h-4 text-emerald-400"></i>
+                    去背結果
+                </h2>
+
+                <!-- 空狀態 -->
+                <div id="emptyState" class="flex flex-col items-center justify-center py-16 text-slate-500">
+                    <i data-lucide="image-off" class="w-16 h-16 mb-4 opacity-30"></i>
+                    <p class="font-medium">尚未處理</p>
+                    <p class="text-sm mt-1">上傳圖片並點擊「開始去背」</p>
+                </div>
+
+                <!-- 結果對比 -->
+                <div id="resultView" class="hidden">
+                    <div class="comparison-slider checkerboard" id="comparisonSlider">
+                        <img id="beforeImg" class="before-img" alt="原圖">
+                        <img id="afterImg" class="after-img" alt="去背後">
+                        <div class="slider-line" id="sliderLine"></div>
+                        <div class="slider-handle" id="sliderHandle">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#333" stroke-width="2.5">
+                                <path d="M8 4l-6 8 6 8M16 4l6 8-6 8"/>
+                            </svg>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between mt-3 text-xs text-slate-500">
+                        <span>← 去背結果（棋盤格 = 透明）</span>
+                        <span class="text-slate-400 font-medium">拖曳滑桿對比</span>
+                        <span>原圖 →</span>
+                    </div>
+                </div>
+
+                <!-- 處理中動畫 -->
+                <div id="processingOverlay" class="processing-overlay hidden">
+                    <div class="pulse-ring"></div>
+                    <p class="text-slate-200 font-semibold mb-1">AI 正在分析圖片...</p>
+                    <p class="text-slate-400 text-sm">首次使用需下載模型，請稍候</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── DOM 元素 ──
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const uploadPrompt = document.getElementById('uploadPrompt');
+    const originalPreview = document.getElementById('originalPreview');
+    const originalImg = document.getElementById('originalImg');
+    const removeBtn = document.getElementById('removeBtn');
+    const downloadBtn = document.getElementById('downloadBtn');
+    const emptyState = document.getElementById('emptyState');
+    const resultView = document.getElementById('resultView');
+    const processingOverlay = document.getElementById('processingOverlay');
+    const beforeImg = document.getElementById('beforeImg');
+    const afterImg = document.getElementById('afterImg');
+
+    let currentFile = null;
+    let resultDataUrl = null;
+
+    // ── 拖曳上傳 ──
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+    });
+
+    dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('drag-over');
+    });
+
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        const file = e.dataTransfer.files[0];
+        if (file && file.type.startsWith('image/')) {
+            handleFile(file);
+        }
+    });
+
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files[0]) handleFile(e.target.files[0]);
+    });
+
+    function handleFile(file) {
+        currentFile = file;
+        const url = URL.createObjectURL(file);
+        originalImg.src = url;
+        uploadPrompt.classList.add('hidden');
+        originalPreview.classList.remove('hidden');
+        removeBtn.disabled = false;
+        downloadBtn.disabled = true;
+        resultDataUrl = null;
+
+        // 重置結果區
+        resultView.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+
+        lucide.createIcons();
+    }
+
+    // ── 去背處理 ──
+    async function processImage() {
+        if (!currentFile) return;
+
+        removeBtn.disabled = true;
+        removeBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> 處理中...';
+        emptyState.classList.add('hidden');
+        processingOverlay.classList.remove('hidden');
+
+        try {
+            const formData = new FormData();
+            formData.append('image', currentFile);
+
+            const response = await fetch('/api/remove-bg', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                resultDataUrl = data.image;
+
+                // 顯示對比
+                beforeImg.src = originalImg.src;
+                afterImg.src = resultDataUrl;
+                resultView.classList.remove('hidden');
+                processingOverlay.classList.add('hidden');
+                downloadBtn.disabled = false;
+
+                // 初始化滑桿
+                initComparisonSlider();
+
+                removeBtn.innerHTML = '<i data-lucide="wand-2" class="w-5 h-5"></i> 重新去背';
+                removeBtn.disabled = false;
+                lucide.createIcons();
+            } else {
+                throw new Error(data.error || '處理失敗');
+            }
+        } catch (err) {
+            processingOverlay.classList.add('hidden');
+            emptyState.classList.remove('hidden');
+            alert('去背失敗：' + err.message);
+            removeBtn.innerHTML = '<i data-lucide="wand-2" class="w-5 h-5"></i> 開始去背';
+            removeBtn.disabled = false;
+            lucide.createIcons();
+        }
+    }
+
+    // ── 下載結果 ──
+    function downloadResult() {
+        if (!resultDataUrl) return;
+        const a = document.createElement('a');
+        a.href = resultDataUrl;
+        const originalName = currentFile ? currentFile.name.replace(/\.[^.]+$/, '') : 'image';
+        a.download = originalName + '_去背.png';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // ── 對比滑桿 ──
+    function initComparisonSlider() {
+        const slider = document.getElementById('comparisonSlider');
+        const line = document.getElementById('sliderLine');
+        const handle = document.getElementById('sliderHandle');
+        const beforeImage = document.getElementById('beforeImg');
+        const afterImage = document.getElementById('afterImg');
+
+        let isDragging = false;
+
+        function updateSlider(x) {
+            const rect = slider.getBoundingClientRect();
+            let percent = ((x - rect.left) / rect.width) * 100;
+            percent = Math.max(0, Math.min(100, percent));
+            // after 顯示左邊（去背結果 + 棋盤格），before 顯示右邊（原圖）
+            afterImage.style.clipPath = `inset(0 ${100 - percent}% 0 0)`;
+            beforeImage.style.clipPath = `inset(0 0 0 ${percent}%)`;
+            line.style.left = percent + '%';
+            handle.style.left = percent + '%';
+        }
+
+        function onMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const x = e.touches ? e.touches[0].clientX : e.clientX;
+            updateSlider(x);
+        }
+
+        function onEnd() { isDragging = false; }
+
+        handle.addEventListener('mousedown', () => isDragging = true);
+        handle.addEventListener('touchstart', () => isDragging = true);
+        line.addEventListener('mousedown', () => isDragging = true);
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove);
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchend', onEnd);
+
+        // 點擊直接跳到位置
+        slider.addEventListener('click', (e) => {
+            updateSlider(e.clientX);
+        });
+    }
+
+    lucide.createIcons();
+</script>
+{% endblock %}

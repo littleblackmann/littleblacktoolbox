@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}小黑工具箱{% endblock %}</title>
+    <script src="{{ url_for('static', filename='js/tailwind.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/lucide.min.js') }}"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Microsoft JhengHei"', '"Noto Sans TC"', 'system-ui', 'sans-serif'],
+                        mono: ['Consolas', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg: #06080d;
+            --bg2: #0a0e17;
+            --surface: #111827;
+            --surface2: #1a2234;
+            --border: #1e293b;
+            --border-hover: #334155;
+            --text: #f1f5f9;
+            --text-dim: #64748b;
+            --accent: #3b82f6;
+            --accent-light: #60a5fa;
+            --accent-glow: rgba(59, 130, 246, 0.15);
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', 'Noto Sans TC', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* 全域背景動態網格 */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                radial-gradient(ellipse 80% 50% at 50% -20%, rgba(59,130,246,0.08), transparent),
+                radial-gradient(circle at 20% 80%, rgba(139,92,246,0.05), transparent),
+                radial-gradient(circle at 80% 60%, rgba(14,165,233,0.05), transparent);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        body::after {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(59,130,246,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(59,130,246,0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+        }
+
+        /* 導航列 */
+        .nav-bar {
+            background: rgba(10, 14, 23, 0.8);
+            backdrop-filter: blur(20px) saturate(1.2);
+            border-bottom: 1px solid rgba(30, 41, 59, 0.6);
+        }
+
+        .nav-logo {
+            background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .nav-link {
+            color: var(--text-dim);
+            transition: all 0.2s;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+
+        .nav-link:hover {
+            color: var(--text);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
+        .nav-link.active {
+            color: var(--accent-light);
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        /* 返回按鈕 */
+        .back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-dim);
+            font-size: 0.875rem;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            transition: all 0.2s;
+            text-decoration: none;
+        }
+
+        .back-btn:hover {
+            color: var(--text);
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* 通用玻璃面板 */
+        .glass {
+            background: rgba(17, 24, 39, 0.6);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(30, 41, 59, 0.6);
+            border-radius: 16px;
+        }
+
+        /* 棋盤格透明預覽底 */
+        .checkerboard {
+            background-image:
+                linear-gradient(45deg, #1e293b 25%, transparent 25%),
+                linear-gradient(-45deg, #1e293b 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #1e293b 75%),
+                linear-gradient(-45deg, transparent 75%, #1e293b 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+            background-color: #0f172a;
+        }
+
+        /* 按鈕 */
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+            font-weight: 600;
+            padding: 0.75rem 1.5rem;
+            border-radius: 12px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 20px rgba(59, 130, 246, 0.25);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 30px rgba(59, 130, 246, 0.35);
+        }
+
+        .btn-primary:active {
+            transform: scale(0.98);
+        }
+
+        .btn-primary:disabled {
+            background: #1e293b;
+            color: #475569;
+            box-shadow: none;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 動畫 */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .animate-in {
+            animation: fadeInUp 0.5s ease-out forwards;
+        }
+
+        .animate-delay-1 { animation-delay: 0.1s; opacity: 0; }
+        .animate-delay-2 { animation-delay: 0.2s; opacity: 0; }
+        .animate-delay-3 { animation-delay: 0.3s; opacity: 0; }
+
+        /* 滾動條 */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+    <div class="content-wrapper min-h-screen flex flex-col">
+        <!-- 導航列 -->
+        <nav class="nav-bar sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex items-center justify-between h-14">
+                    <div class="flex items-center gap-6">
+                        <a href="/" class="flex items-center gap-2 no-underline">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                                <i data-lucide="box" class="w-4 h-4 text-white"></i>
+                            </div>
+                            <span class="nav-logo font-bold text-lg tracking-tight">小黑工具箱</span>
+                        </a>
+                        <div class="hidden md:flex items-center gap-1">
+                            <a href="/" class="nav-link {% block nav_home %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> 首頁</span>
+                            </a>
+                            <a href="/tool/bg-remover" class="nav-link {% block nav_bg %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="eraser" class="w-3.5 h-3.5"></i> AI 去背</span>
+                            </a>
+                            <a href="/tool/png-to-ico" class="nav-link {% block nav_ico %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5"></i> PNG 轉 ICO</span>
+                            </a>
+                            <a href="/tool/text-converter" class="nav-link {% block nav_text %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> 文字轉檔</span>
+                            </a>
+                            <a href="/tool/qrcode" class="nav-link {% block nav_qr %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> QR Code</span>
+                            </a>
+                            <a href="/tool/ocr" class="nav-link {% block nav_ocr %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="scan-text" class="w-3.5 h-3.5"></i> OCR</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                        <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
+                        <span class="hidden sm:inline">完全離線運作</span>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主內容 -->
+        <main class="flex-1">
+            {% block content %}{% endblock %}
+        </main>
+
+        <!-- 頁腳 -->
+        <!-- 更新通知 Banner -->
+        <div id="update-banner" style="display:none; position:fixed; top:0; left:0; right:0; z-index:9999; background:linear-gradient(135deg,#1e3a5f,#1a2744); border-bottom:1px solid #3b82f6; padding:12px 24px; animation:slideDown .4s ease-out;">
+            <div class="max-w-7xl mx-auto flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-3 text-sm">
+                    <span style="background:#3b82f6; padding:2px 10px; border-radius:6px; font-weight:700; font-size:12px; color:#fff;">NEW</span>
+                    <span class="text-slate-200" id="update-msg">發現新版本 v---</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="applyUpdate()" id="update-btn" style="background:linear-gradient(135deg,#3b82f6,#2563eb); color:#fff; border:none; padding:6px 18px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer;">
+                        立即更新
+                    </button>
+                    <button onclick="document.getElementById('update-banner').style.display='none'" style="background:none; border:none; color:#64748b; cursor:pointer; padding:6px; font-size:18px;">
+                        &times;
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <footer class="border-t border-slate-800/50 py-4 text-center text-xs text-slate-600">
+            小黑工具箱 <span id="footer-version">v1.0.0</span> &mdash; 本地離線運作，你的檔案不會上傳到任何地方。
+        </footer>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // 更新檢查（頁面載入 3 秒後）
+        setTimeout(async () => {
+            try {
+                const resp = await fetch('/api/check-update');
+                const data = await resp.json();
+                if (data.has_update) {
+                    document.getElementById('update-msg').textContent = `發現新版本 v${data.version}！`;
+                    document.getElementById('update-banner').style.display = 'block';
+                }
+                // 顯示目前版本
+                const vResp = await fetch('/api/version');
+                const vData = await vResp.json();
+                const el = document.getElementById('footer-version');
+                if (el && vData.version) el.textContent = 'v' + vData.version;
+            } catch(e) {}
+        }, 3000);
+
+        async function applyUpdate() {
+            const btn = document.getElementById('update-btn');
+            btn.textContent = '更新中...';
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            try {
+                const resp = await fetch('/api/apply-update', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    document.getElementById('update-msg').textContent = '更新完成！程式重啟中，請稍候重新整理頁面...';
+                    btn.style.display = 'none';
+                } else {
+                    btn.textContent = '更新失敗';
+                    document.getElementById('update-msg').textContent = data.error || '更新失敗';
+                }
+            } catch(e) {
+                btn.textContent = '更新失敗';
+            }
+        }
+    </script>
+    <style>
+        @keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }
+    </style>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
