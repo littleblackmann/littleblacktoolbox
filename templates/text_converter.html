@@ -320,7 +320,6 @@ textarea::placeholder { color: #475569; }
 
     <!-- 格式標籤 -->
     <div class="format-chips animate-in animate-delay-1">
-        <span class="format-chip highlight">PDF</span>
         <span class="format-chip">Markdown</span>
         <span class="format-chip">HTML</span>
         <span class="format-chip">CSV</span>
@@ -333,10 +332,10 @@ textarea::placeholder { color: #475569; }
 
     <!-- 拖放上傳區 -->
     <div class="text-drop-zone animate-in animate-delay-1" id="dropZone">
-        <input type="file" id="fileInput" accept=".txt,.md,.markdown,.html,.htm,.csv,.tsv,.json,.yaml,.yml,.xml,.pdf">
+        <input type="file" id="fileInput" accept=".txt,.md,.markdown,.html,.htm,.csv,.tsv,.json,.yaml,.yml,.xml">
         <div class="flex items-center justify-center gap-3">
             <i data-lucide="file-up" class="w-5 h-5 text-slate-500"></i>
-            <span class="text-slate-400 text-sm">拖放檔案到這裡，或<span class="text-blue-400 underline">點擊選擇</span>（支援 PDF）</span>
+            <span class="text-slate-400 text-sm">拖放檔案到這裡，或<span class="text-blue-400 underline">點擊選擇</span></span>
         </div>
         <div id="fileTag" class="mt-2"></div>
     </div>
@@ -345,14 +344,9 @@ textarea::placeholder { color: #475569; }
     <div class="converter-grid animate-in animate-delay-2">
         <!-- 輸入面板 -->
         <div class="panel" style="position:relative">
-            <div class="loading-overlay" id="loadingOverlay">
-                <div class="loading-spinner"></div>
-                <div class="text-xs text-slate-400">正在解析 PDF...</div>
-            </div>
             <div class="panel-header">
                 <span class="panel-label">輸入</span>
                 <select class="format-select" id="inputFormat">
-                    <option value="pdf">PDF（文字提取）</option>
                     <option value="markdown" selected>Markdown</option>
                     <option value="html">HTML</option>
                     <option value="csv">CSV</option>
@@ -368,7 +362,6 @@ textarea::placeholder { color: #475569; }
             </div>
             <div class="status-bar">
                 <span id="inputStats">0 字元 · 0 行</span>
-                <span id="pdfPageInfo"></span>
             </div>
         </div>
 
@@ -434,11 +427,8 @@ textarea::placeholder { color: #475569; }
 <script src="{{ url_for('static', filename='js/turndown.js') }}"></script>
 <script src="{{ url_for('static', filename='js/papaparse.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/js-yaml.min.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pdf.min.js') }}"></script>
 <script src="{{ url_for('static', filename='js/html2pdf.bundle.min.js') }}"></script>
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = "{{ url_for('static', filename='js/pdf.worker.min.js') }}";
-
 const $ = id => document.getElementById(id);
 const inputText = $('inputText');
 const inputFormat = $('inputFormat');
@@ -451,7 +441,6 @@ const dropZone = $('dropZone');
 const fileInput = $('fileInput');
 const fileTag = $('fileTag');
 const pdfNotice = $('pdfNotice');
-const loadingOverlay = $('loadingOverlay');
 
 let currentOutput = '';
 
@@ -472,18 +461,13 @@ outputFormat.addEventListener('change', () => {
 });
 
 inputFormat.addEventListener('change', () => {
-    if (inputFormat.value === 'pdf') {
-        inputText.placeholder = 'PDF 檔案請用上方拖放或點擊上傳\n\n上傳後文字會自動提取並顯示在這裡';
-    } else {
-        inputText.placeholder = '在這裡貼上內容，或透過上方拖放檔案...';
-    }
     autoSuggestOutput();
 });
 
 function autoSuggestOutput() {
     const inF = inputFormat.value;
     const suggestions = {
-        pdf:'markdown', markdown:'html', html:'markdown', csv:'json', tsv:'json',
+        markdown:'html', html:'markdown', csv:'json', tsv:'json',
         json:'yaml', yaml:'json', xml:'json', text:'markdown'
     };
     if (suggestions[inF] && outputFormat.value === inF) {
@@ -499,30 +483,8 @@ const extMap = {
     'json':'json',
     'yaml':'yaml','yml':'yaml',
     'xml':'xml',
-    'txt':'text',
-    'pdf':'pdf'
+    'txt':'text'
 };
-
-async function extractPdfText(arrayBuffer) {
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    const totalPages = pdf.numPages;
-    let fullText = '';
-    for (let i = 1; i <= totalPages; i++) {
-        const page = await pdf.getPage(i);
-        const content = await page.getTextContent();
-        const lines = [];
-        let lastY = null;
-        for (const item of content.items) {
-            if (lastY !== null && Math.abs(item.transform[5] - lastY) > 2) lines.push('\n');
-            lines.push(item.str);
-            lastY = item.transform[5];
-        }
-        if (i > 1) fullText += '\n\n';
-        fullText += lines.join('');
-    }
-    $('pdfPageInfo').textContent = `${totalPages} 頁`;
-    return { text: fullText, pages: totalPages };
-}
 
 async function handleFile(file) {
     const ext = file.name.split('.').pop().toLowerCase();
@@ -532,54 +494,17 @@ async function handleFile(file) {
     fileTag.innerHTML = `<span class="file-tag"><i data-lucide="file" class="w-3 h-3"></i> ${file.name} <span class="close" onclick="clearFile()">×</span></span>`;
     lucide.createIcons();
 
-    if (fmt === 'pdf') {
-        loadingOverlay.classList.add('show');
-        statusDot.className = 'status-dot loading';
-        statusText.textContent = '正在解析 PDF...';
-        try {
-            const arrayBuffer = await file.arrayBuffer();
-            const result = await extractPdfText(arrayBuffer);
-            const trimmed = result.text.trim();
-            inputText.value = result.text;
-            inputText.dispatchEvent(new Event('input'));
-
-            if (trimmed.length < 10) {
-                // 文字太少，可能是掃描/圖片型 PDF
-                statusDot.className = 'status-dot error';
-                statusText.textContent = `PDF 為掃描/圖片型，無法提取文字`;
-                inputText.value = '';
-                inputText.dispatchEvent(new Event('input'));
-                toast('此 PDF 是圖片型，建議使用 OCR 工具辨識');
-                // 顯示提示訊息
-                if (confirm('此 PDF 似乎是掃描/圖片型，沒有可提取的文字。\n\n要前往 OCR 文字辨識工具嗎？（可以直接截圖貼上辨識）')) {
-                    window.location.href = '/tool/ocr';
-                }
-            } else {
-                statusDot.className = 'status-dot success';
-                statusText.textContent = `PDF 解析完成（${result.pages} 頁，${trimmed.length} 字）`;
-                toast(`PDF 解析完成：${result.pages} 頁，${trimmed.length} 字`);
-            }
-        } catch (err) {
-            statusDot.className = 'status-dot error';
-            statusText.textContent = `PDF 解析失敗：${err.message}`;
-            toast('PDF 解析失敗');
-        } finally {
-            loadingOverlay.classList.remove('show');
-        }
-    } else {
-        const reader = new FileReader();
-        reader.onload = e => {
-            inputText.value = e.target.result;
-            inputText.dispatchEvent(new Event('input'));
-        };
-        reader.readAsText(file, 'UTF-8');
-    }
+    const reader = new FileReader();
+    reader.onload = e => {
+        inputText.value = e.target.result;
+        inputText.dispatchEvent(new Event('input'));
+    };
+    reader.readAsText(file, 'UTF-8');
 }
 
 function clearFile() {
     fileTag.innerHTML = '';
     fileInput.value = '';
-    $('pdfPageInfo').textContent = '';
 }
 
 fileInput.addEventListener('change', e => {
@@ -640,7 +565,6 @@ function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>
 // ============ CONVERTERS ============
 function parseInput(text, fmt) {
     switch(fmt) {
-        case 'pdf': return { type:'text', data: text };
         case 'markdown': return { type:'markup', data: marked.parse(text), raw: text };
         case 'html': return { type:'markup', data: text, raw: text };
         case 'csv': return { type:'table', data: Papa.parse(text, { header:true, skipEmptyLines:true }) };
@@ -828,7 +752,7 @@ $('convertBtn').addEventListener('click', () => {
 });
 
 $('swapBtn').addEventListener('click', () => {
-    if (outputFormat.value === 'pdf' || inputFormat.value === 'pdf') { toast('PDF 格式無法交換'); return; }
+    if (outputFormat.value === 'pdf') { toast('PDF 匯出格式無法交換'); return; }
     const tmp = inputFormat.value;
     inputFormat.value = outputFormat.value;
     outputFormat.value = tmp;
@@ -881,7 +805,6 @@ $('clearBtn').addEventListener('click', () => {
     statusText.textContent = '等待轉換';
     $('inputStats').textContent = '0 字元 · 0 行';
     $('outputStats').textContent = '0 字元';
-    $('pdfPageInfo').textContent = '';
     pdfNotice.classList.remove('show');
     clearFile();
     toast('已清除');
