@@ -539,11 +539,26 @@ async function handleFile(file) {
         try {
             const arrayBuffer = await file.arrayBuffer();
             const result = await extractPdfText(arrayBuffer);
+            const trimmed = result.text.trim();
             inputText.value = result.text;
             inputText.dispatchEvent(new Event('input'));
-            statusDot.className = 'status-dot success';
-            statusText.textContent = `PDF 解析完成（${result.pages} 頁）`;
-            toast(`PDF 解析完成：${result.pages} 頁`);
+
+            if (trimmed.length < 10) {
+                // 文字太少，可能是掃描/圖片型 PDF
+                statusDot.className = 'status-dot error';
+                statusText.textContent = `PDF 為掃描/圖片型，無法提取文字`;
+                inputText.value = '';
+                inputText.dispatchEvent(new Event('input'));
+                toast('此 PDF 是圖片型，建議使用 OCR 工具辨識');
+                // 顯示提示訊息
+                if (confirm('此 PDF 似乎是掃描/圖片型，沒有可提取的文字。\n\n要前往 OCR 文字辨識工具嗎？（可以直接截圖貼上辨識）')) {
+                    window.location.href = '/tool/ocr';
+                }
+            } else {
+                statusDot.className = 'status-dot success';
+                statusText.textContent = `PDF 解析完成（${result.pages} 頁，${trimmed.length} 字）`;
+                toast(`PDF 解析完成：${result.pages} 頁，${trimmed.length} 字`);
+            }
         } catch (err) {
             statusDot.className = 'status-dot error';
             statusText.textContent = `PDF 解析失敗：${err.message}`;
