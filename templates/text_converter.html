@@ -443,6 +443,17 @@ const fileTag = $('fileTag');
 const pdfNotice = $('pdfNotice');
 
 let currentOutput = '';
+let convertedFormat = '';
+
+function invalidateOutput() {
+    currentOutput = '';
+    convertedFormat = '';
+    outputRaw.textContent = '';
+    outputPreview.textContent = '';
+    $('outputStats').textContent = '0 字元';
+    statusDot.className = 'status-dot';
+    statusText.textContent = '內容已變更，請重新轉換';
+}
 
 function toast(msg) {
     const t = $('toast');
@@ -452,15 +463,18 @@ function toast(msg) {
 }
 
 inputText.addEventListener('input', () => {
+    invalidateOutput();
     const v = inputText.value;
     $('inputStats').textContent = `${v.length} 字元 · ${v ? v.split('\n').length : 0} 行`;
 });
 
 outputFormat.addEventListener('change', () => {
+    invalidateOutput();
     pdfNotice.classList.toggle('show', outputFormat.value === 'pdf');
 });
 
 inputFormat.addEventListener('change', () => {
+    invalidateOutput();
     autoSuggestOutput();
 });
 
@@ -491,7 +505,7 @@ async function handleFile(file) {
     const fmt = extMap[ext] || 'text';
     inputFormat.value = fmt;
     autoSuggestOutput();
-    fileTag.innerHTML = `<span class="file-tag"><i data-lucide="file" class="w-3 h-3"></i> ${file.name} <span class="close" onclick="clearFile()">×</span></span>`;
+    fileTag.innerHTML = `<span class="file-tag"><i data-lucide="file" class="w-3 h-3"></i> ${esc(file.name)} <span class="close" onclick="clearFile()">×</span></span>`;
     lucide.createIcons();
 
     const reader = new FileReader();
@@ -535,11 +549,11 @@ document.querySelectorAll('.output-tab').forEach(tab => {
 });
 
 function renderPreview() {
-    const fmt = outputFormat.value;
+    const fmt = convertedFormat;
     if (fmt === 'html') {
-        outputPreview.innerHTML = currentOutput;
+        outputPreview.innerHTML = sanitizeHtml(currentOutput);
     } else if (fmt === 'markdown') {
-        outputPreview.innerHTML = marked.parse(currentOutput);
+        outputPreview.innerHTML = sanitizeHtml(marked.parse(currentOutput));
     } else if (fmt === 'csv' || fmt === 'tsv') {
         const parsed = Papa.parse(currentOutput, { header: true });
         if (parsed.data.length) {
@@ -554,39 +568,108 @@ function renderPreview() {
             outputPreview.textContent = currentOutput;
         }
     } else if (fmt === 'pdf') {
-        outputPreview.innerHTML = '<div style="padding:1rem;">' + currentOutput + '</div>';
+        outputPreview.innerHTML = sanitizeHtml(currentOutput);
     } else {
         outputPreview.innerHTML = `<pre><code>${esc(currentOutput)}</code></pre>`;
     }
 }
 
-function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function sanitizeHtml(html) {
+    const doc = new DOMParser().parseFromString(String(html), 'text/html');
+    const blocked = new Set(['script', 'style', 'iframe', 'object', 'embed', 'link',
+        'meta', 'base', 'form', 'input', 'button', 'svg', 'math', 'video', 'audio',
+        'source', 'picture', 'canvas']);
+    for (const element of Array.from(doc.body.querySelectorAll('*'))) {
+        if (blocked.has(element.localName) || element.localName.includes('-')) {
+            element.remove();
+            continue;
+        }
+        for (const attribute of Array.from(element.attributes)) {
+            const name = attribute.name.toLowerCase();
+            if (name === 'src' && element.localName === 'img' &&
+                    /^data:image\/(png|jpeg|webp);base64,/i.test(attribute.value)) continue;
+            if (!['alt', 'title', 'colspan', 'rowspan'].includes(name)) {
+                element.removeAttribute(attribute.name);
+            }
+        }
+    }
+    return doc.body.innerHTML;
+}
 
 // ============ CONVERTERS ============
 function parseInput(text, fmt) {
     switch(fmt) {
         case 'markdown': return { type:'markup', data: marked.parse(text), raw: text };
         case 'html': return { type:'markup', data: text, raw: text };
-        case 'csv': return { type:'table', data: Papa.parse(text, { header:true, skipEmptyLines:true }) };
-        case 'tsv': return { type:'table', data: Papa.parse(text, { header:true, delimiter:'\t', skipEmptyLines:true }) };
+        case 'csv':
+        case 'tsv': {
+            const parsed = Papa.parse(text, {
+                header: true, skipEmptyLines: true,
+                delimiter: fmt === 'tsv' ? '\t' : ',',
+            });
+            if (parsed.errors.length) throw new Error(`${fmt.toUpperCase()} 格式錯誤：${parsed.errors[0].message}`);
+            return { type:'table', data: parsed };
+        }
         case 'json': {
             const obj = JSON.parse(text);
-            if (Array.isArray(obj) && obj.length && typeof obj[0] === 'object') {
+            if (Array.isArray(obj) && obj.length && obj.every(item =>
+                    item !== null && typeof item === 'object' && !Array.isArray(item))) {
                 return { type:'table', data: { data: obj, meta: { fields: Object.keys(obj[0]) } } };
             }
             return { type:'data', data: obj };
         }
         case 'yaml': {
             const obj = jsyaml.load(text);
-            if (Array.isArray(obj) && obj.length && typeof obj[0] === 'object') {
+            if (Array.isArray(obj) && obj.length && obj.every(item =>
+                    item !== null && typeof item === 'object' && !Array.isArray(item))) {
                 return { type:'table', data: { data: obj, meta: { fields: Object.keys(obj[0]) } } };
             }
             return { type:'data', data: obj };
         }
-        case 'xml': return { type:'markup', data: text, raw: text };
+        case 'xml': return { type:'data', data: parseXml(text), raw: text };
         case 'text': return { type:'text', data: text };
         default: return { type:'text', data: text };
     }
+}
+
+function parseXml(text) {
+    const document = new DOMParser().parseFromString(text, 'application/xml');
+    if (document.querySelector('parsererror') || !document.documentElement) {
+        throw new Error('XML 格式錯誤');
+    }
+    function convertElement(element) {
+        const children = Array.from(element.children);
+        const attrs = Array.from(element.attributes);
+        const content = Array.from(element.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE || node.nodeType === Node.CDATA_SECTION_NODE)
+            .map(node => node.textContent).join('').trim();
+        if (!children.length && !attrs.length) return content;
+        const result = {};
+        attrs.forEach(attr => { result['@' + attr.name] = attr.value; });
+        children.forEach(child => {
+            const value = convertElement(child);
+            if (!(child.nodeName in result)) result[child.nodeName] = value;
+            else if (Array.isArray(result[child.nodeName])) result[child.nodeName].push(value);
+            else result[child.nodeName] = [result[child.nodeName], value];
+        });
+        if (content) result['#text'] = content;
+        return result;
+    }
+    return { [document.documentElement.nodeName]: convertElement(document.documentElement) };
+}
+
+function toTableRows(data) {
+    const values = Array.isArray(data) ? data : [data];
+    return values.map(value => {
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+            return { content: JSON.stringify(value) ?? '' };
+        }
+        return Object.fromEntries(Object.entries(value).map(([key, item]) => [
+            key, item !== null && typeof item === 'object' ? JSON.stringify(item) : item ?? '',
+        ]));
+    });
 }
 
 function convertToOutput(parsed, outFmt, inFmt) {
@@ -617,9 +700,17 @@ function convertToOutput(parsed, outFmt, inFmt) {
         }
         if (outFmt === 'text') {
             const tmp = document.createElement('div');
-            tmp.innerHTML = parsed.data;
+            tmp.innerHTML = sanitizeHtml(parsed.data);
             return tmp.textContent || tmp.innerText;
         }
+        const tmp = document.createElement('div');
+        tmp.innerHTML = sanitizeHtml(parsed.data);
+        const content = tmp.textContent || '';
+        if (outFmt === 'json') return JSON.stringify({ content }, null, 2);
+        if (outFmt === 'yaml') return jsyaml.dump({ content });
+        if (outFmt === 'csv') return Papa.unparse([{ content }]);
+        if (outFmt === 'tsv') return Papa.unparse([{ content }], { delimiter:'\t' });
+        if (outFmt === 'xml') return `<content>${esc(content)}</content>`;
     }
     if (parsed.type === 'table') {
         const rows = parsed.data.data;
@@ -660,10 +751,12 @@ function convertToOutput(parsed, outFmt, inFmt) {
             case 'json': return JSON.stringify(parsed.data, null, 2);
             case 'yaml': return jsyaml.dump(parsed.data, { lineWidth:-1 });
             case 'xml': return jsonToXml(parsed.data);
-            case 'text': return JSON.stringify(parsed.data, null, 2);
-            case 'markdown': return '```json\n' + JSON.stringify(parsed.data, null, 2) + '\n```';
-            case 'html': return '<pre><code>' + esc(JSON.stringify(parsed.data, null, 2)) + '</code></pre>';
-            default: return JSON.stringify(parsed.data, null, 2);
+            case 'csv': return Papa.unparse(toTableRows(parsed.data));
+            case 'tsv': return Papa.unparse(toTableRows(parsed.data), { delimiter:'\t' });
+            case 'text': return parsed.raw || JSON.stringify(parsed.data, null, 2);
+            case 'markdown': return '```' + (inFmt === 'xml' ? 'xml' : 'json') + '\n' +
+                (parsed.raw || JSON.stringify(parsed.data, null, 2)) + '\n```';
+            case 'html': return '<pre><code>' + esc(parsed.raw || JSON.stringify(parsed.data, null, 2)) + '</code></pre>';
         }
     }
     if (parsed.type === 'text') {
@@ -673,10 +766,12 @@ function convertToOutput(parsed, outFmt, inFmt) {
             case 'html': return parsed.data.split('\n').map(l => `<p>${esc(l)}</p>`).join('\n');
             case 'json': return JSON.stringify({ content: parsed.data }, null, 2);
             case 'yaml': return jsyaml.dump({ content: parsed.data });
-            default: return parsed.data;
+            case 'csv': return Papa.unparse([{ content: parsed.data }]);
+            case 'tsv': return Papa.unparse([{ content: parsed.data }], { delimiter:'\t' });
+            case 'xml': return `<content>${esc(parsed.data)}</content>`;
         }
     }
-    return String(parsed.data || parsed.raw || '');
+    throw new Error('不支援這個格式組合');
 }
 
 function sanitizeTag(s) { return s.replace(/[^a-zA-Z0-9_\u4e00-\u9fff]/g, '_').replace(/^(\d)/, '_$1') || 'field'; }
@@ -706,7 +801,7 @@ function jsonToXml(obj, indent='') {
 async function exportToPdf(htmlContent) {
     const container = document.createElement('div');
     container.style.cssText = 'font-family: "Noto Sans TC", sans-serif; font-size: 14px; line-height: 1.8; color: #1a1a1a; padding: 0; max-width: 100%;';
-    container.innerHTML = htmlContent;
+    container.innerHTML = sanitizeHtml(htmlContent);
     container.querySelectorAll('table').forEach(t => { t.style.cssText = 'border-collapse: collapse; width: 100%; margin: 1em 0;'; });
     container.querySelectorAll('th, td').forEach(cell => { cell.style.cssText = 'border: 1px solid #ccc; padding: 6px 10px; text-align: left;'; });
     container.querySelectorAll('th').forEach(th => { th.style.background = '#f0f0f0'; });
@@ -730,6 +825,7 @@ $('convertBtn').addEventListener('click', () => {
     try {
         const parsed = parseInput(text, inFmt);
         currentOutput = convertToOutput(parsed, outFmt, inFmt);
+        convertedFormat = outFmt;
         if (outFmt === 'pdf') {
             outputRaw.textContent = '[ PDF 模式 — 點擊「下載」匯出 ]\n\n' +
                 currentOutput.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').substring(0, 500) + '...';
@@ -744,6 +840,8 @@ $('convertBtn').addEventListener('click', () => {
         if (activeTab && activeTab.dataset.tab === 'preview') renderPreview();
         toast('轉換成功 ✓');
     } catch(err) {
+        currentOutput = '';
+        convertedFormat = '';
         statusDot.className = 'status-dot error';
         statusText.textContent = `轉換失敗：${err.message}`;
         outputRaw.textContent = `錯誤：${err.message}\n\n提示：請確認輸入格式選擇正確。`;
@@ -763,13 +861,15 @@ $('swapBtn').addEventListener('click', () => {
 
 $('copyBtn').addEventListener('click', () => {
     if (!currentOutput) { toast('尚無輸出結果'); return; }
-    if (outputFormat.value === 'pdf') { toast('PDF 格式請用下載按鈕'); return; }
-    navigator.clipboard.writeText(currentOutput).then(() => toast('已複製到剪貼簿'));
+    if (convertedFormat === 'pdf') { toast('PDF 格式請用下載按鈕'); return; }
+    navigator.clipboard.writeText(currentOutput)
+        .then(() => toast('已複製到剪貼簿'))
+        .catch(() => toast('複製失敗，請改用下載'));
 });
 
 $('downloadBtn').addEventListener('click', async () => {
     if (!currentOutput) { toast('尚無輸出結果'); return; }
-    if (outputFormat.value === 'pdf') {
+    if (convertedFormat === 'pdf') {
         statusDot.className = 'status-dot loading';
         statusText.textContent = '正在產生 PDF...';
         toast('正在產生 PDF...');
@@ -786,13 +886,13 @@ $('downloadBtn').addEventListener('click', async () => {
         return;
     }
     const extLookup = { markdown:'.md', html:'.html', csv:'.csv', tsv:'.tsv', json:'.json', yaml:'.yaml', xml:'.xml', text:'.txt' };
-    const ext = extLookup[outputFormat.value] || '.txt';
+    const ext = extLookup[convertedFormat] || '.txt';
     const blob = new Blob([currentOutput], { type:'text/plain;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = `converted${ext}`;
     a.click();
-    URL.revokeObjectURL(a.href);
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
     toast('檔案已下載');
 });
 

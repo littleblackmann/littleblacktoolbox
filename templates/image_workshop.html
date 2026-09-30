@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}圖片批次處理 — 小黑工具箱{% endblock %}
+{% block nav_image %}active{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/workshops.css') }}">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <a href="/" class="back-btn mb-5"><i data-lucide="arrow-left" class="w-4 h-4"></i> 返回工具箱</a>
+    <h1 class="text-3xl font-bold mb-2">圖片批次處理</h1>
+    <p class="text-slate-400 mb-7">一次縮圖、壓縮或轉換格式，先比較結果，再下載需要的圖片。</p>
+    <div class="grid md:grid-cols-3 gap-6">
+        <section class="glass p-5 md:col-span-1">
+            <h2 class="font-semibold mb-4">處理設定</h2>
+            <fieldset id="imageSettings" class="space-y-4">
+                <div><label for="imageFormat" class="tool-label">輸出格式</label><select id="imageFormat" class="tool-field"><option value="same">維持原格式</option><option value="WEBP">WebP（體積較小，支援透明）</option><option value="JPEG">JPG（適合照片）</option><option value="PNG">PNG（無損，支援透明）</option></select></div>
+                <div><label for="imagePreset" class="tool-label">常用尺寸</label><select id="imagePreset" class="tool-field"><option value="0">原尺寸</option><option value="1920">網頁／分享：最長邊 1920 px</option><option value="1280">一般上傳：最長邊 1280 px</option><option value="800">小圖：最長邊 800 px</option><option value="custom">自訂尺寸</option></select></div>
+                <div class="grid grid-cols-2 gap-3"><div><label for="imageWidth" class="tool-label">最大寬度 px</label><input id="imageWidth" class="tool-field" type="number" min="0" max="10000" value="0"></div><div><label for="imageHeight" class="tool-label">最大高度 px</label><input id="imageHeight" class="tool-field" type="number" min="0" max="10000" value="0"></div></div>
+                <p class="text-xs text-slate-500">填 0 表示不限制；保持比例，不放大小圖。</p>
+                <div><label for="imageQuality" class="tool-label">JPG／WebP 品質：<span id="imageQualityValue">85</span></label><input id="imageQuality" type="range" min="1" max="100" value="85" class="w-full accent-blue-500"><p class="text-xs text-slate-500 mt-1">PNG 採無損壓縮，不受品質數值影響。</p></div>
+                <div><label for="imageBackground" class="tool-label">透明圖片轉 JPG 的背景色</label><input id="imageBackground" type="color" value="#ffffff" class="w-full h-9 rounded cursor-pointer"></div>
+                <label class="flex gap-2 text-sm text-slate-400"><input id="imageMetadata" type="checkbox" class="accent-blue-500"> 保留拍攝資訊與色彩描述檔</label>
+                <p class="text-xs text-slate-500">預設移除 EXIF 等拍攝資訊；保留時可能包含 GPS 位置。</p>
+            </fieldset>
+            <button id="processImages" class="btn-primary w-full justify-center mt-6" disabled>開始批次處理</button>
+            <button id="cancelImages" class="tool-secondary w-full mt-2 hidden">停止處理</button>
+            <p id="imageMessage" class="tool-message text-slate-400" role="status" aria-live="polite"></p>
+        </section>
+        <section class="glass p-5 md:col-span-2">
+            <input id="imageFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden">
+            <div id="imageDrop" class="tool-drop" tabindex="0" role="button" aria-label="選擇圖片"><i data-lucide="images" class="w-9 h-9 mx-auto mb-3 text-blue-400"></i><p class="font-medium text-slate-200">拖入圖片，或點擊選擇</p><p class="text-xs mt-2">PNG／JPG／WebP · 最多 50 張，合計 50 MB · 單張 3000 萬像素</p></div>
+            <div class="flex flex-wrap items-center justify-between gap-3 my-4"><span id="imageSummary" class="text-sm text-slate-400">尚未選擇圖片</span><div class="flex gap-2"><button id="clearImages" class="tool-secondary" disabled>清空</button><button id="zipImages" class="tool-secondary" disabled>下載全部 ZIP</button></div></div>
+            <div id="imageList" class="space-y-3"></div>
+            <p class="text-xs text-slate-500 mt-5">左右分別為原圖與處理結果。重新編碼後體積可能變大，可比較後再決定是否下載。</p>
+        </section>
+    </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/jszip.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tool-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/image-workshop.js') }}"></script>
+{% endblock %}

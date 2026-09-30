@@ -14,9 +14,9 @@ import sys
 import json
 import hashlib
 import subprocess
-import shutil
 import zipfile
 from datetime import datetime
+from pathlib import Path
 
 APP_NAME = "小黑工具箱"
 SPEC_FILE = "build_exe.spec"
@@ -44,13 +44,36 @@ def check_env():
         print("  [FAIL] 請先安裝 PyInstaller：pip install pyinstaller")
         return False
 
-    for pkg in ['flask', 'rembg', 'easyocr']:
+    ready = True
+    for pkg in ['flask', 'rembg', 'easyocr', 'pypdf', 'cv2', 'cryptography']:
         try:
             __import__(pkg)
             print(f"  [OK] {pkg}")
         except ImportError:
-            print(f"  [WARN] 缺少套件：{pkg}")
-    return True
+            print(f"  [FAIL] 缺少套件：{pkg}")
+            ready = False
+
+    try:
+        import torch
+        if torch.version.cuda is not None:
+            print('  [FAIL] 打包請使用 CPU 版 PyTorch，避免收進數 GB 的 CUDA 函式庫')
+            ready = False
+    except ImportError:
+        print('  [FAIL] 缺少 PyTorch')
+        ready = False
+
+    model_root = Path.home() / '.EasyOCR' / 'model'
+    required_models = ('craft_mlt_25k.pth', 'chinese.pth', 'english_g2.pth',
+                       'zh_sim_g2.pth', 'japanese_g2.pth', 'korean_g2.pth')
+    for model in required_models:
+        if not (model_root / model).is_file():
+            print(f"  [FAIL] 缺少 OCR 模型：{model_root / model}")
+            ready = False
+    birefnet = Path.home() / '.u2net' / 'birefnet-general.onnx'
+    if not birefnet.is_file():
+        print(f"  [FAIL] 缺少去背模型：{birefnet}")
+        ready = False
+    return ready
 
 
 # ── 差量更新工具 ─────────────────────────────────────────────────
@@ -75,12 +98,23 @@ def generate_manifest(dist_dir: str) -> dict:
     return manifest
 
 
-def _find_previous_manifest(current_version: str) -> dict:
+def _find_previous_manifest(current_version: str, base_version: str | None = None) -> tuple:
     """找到上一個版本的 manifest 作為 patch 基準線"""
     import glob
 
     best_manifest = {}
     best_version = None
+    current_parts = tuple(int(x) for x in current_version.split("."))
+
+    if base_version:
+        if not all(part.isdigit() for part in base_version.split('.')):
+            raise ValueError('基準版本格式錯誤')
+        if tuple(int(x) for x in base_version.split('.')) >= current_parts:
+            raise ValueError('基準版本必須低於新版本')
+        path = Path(f'build_manifest_v{base_version}.json')
+        if not path.is_file():
+            raise ValueError(f'找不到指定基準：{path}')
+        return json.loads(path.read_text(encoding='utf-8')), base_version
 
     for path in glob.glob("build_manifest_v*.json"):
         fname = os.path.basename(path)
@@ -90,6 +124,8 @@ def _find_previous_manifest(current_version: str) -> dict:
         try:
             ver_tuple = tuple(int(x) for x in ver.split("."))
         except ValueError:
+            continue
+        if ver_tuple >= current_parts:
             continue
         if best_version is None or ver_tuple > best_version:
             try:
@@ -103,10 +139,11 @@ def _find_previous_manifest(current_version: str) -> dict:
     if best_manifest:
         print(f"  載入基準 manifest：{best_path}（{len(best_manifest)} 個檔案）")
 
-    return best_manifest
+    return best_manifest, '.'.join(str(x) for x in best_version) if best_version else None
 
 
-def create_patch_zip(dist_dir: str, old_manifest: dict, new_manifest: dict) -> str | None:
+def create_patch_zip(dist_dir: str, old_manifest: dict, new_manifest: dict,
+                     base_version: str) -> str | None:
     """比對新舊 manifest，只把有變動的檔案打成 patch zip"""
     changed = []
     for relpath, new_hash in new_manifest.items():
@@ -124,6 +161,10 @@ def create_patch_zip(dist_dir: str, old_manifest: dict, new_manifest: dict) -> s
         return None
 
     with zipfile.ZipFile(PATCH_ZIP, "w", zipfile.ZIP_DEFLATED, compresslevel=6) as zf:
+        zf.writestr(f"{APP_NAME}/patch_info.json", json.dumps({
+            "from_version": base_version,
+            "to_version": APP_VERSION,
+        }, ensure_ascii=False))
         for relpath in changed:
             filepath = os.path.join(dist_dir, relpath)
             arcname = os.path.join(APP_NAME, relpath)
@@ -138,7 +179,7 @@ def create_patch_zip(dist_dir: str, old_manifest: dict, new_manifest: dict) -> s
 
 # ── 主打包流程 ───────────────────────────────────────────────────
 
-def build():
+def build(base_version=None):
     print("=" * 60)
     print(f"  小黑工具箱 打包建置")
     print(f"  時間：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -147,22 +188,29 @@ def build():
 
     print("\n[0/4] 環境確認...")
     if not check_env():
-        return
+        return False
 
-    # 清理舊的輸出
+    old_manifest, base_version = _find_previous_manifest(APP_VERSION, base_version)
+
+    # Preserve the previous distribution so a failed build can be rolled back.
     if os.path.exists(DIST_DIR):
-        print(f"\n  清理舊版本：{DIST_DIR}")
-        shutil.rmtree(DIST_DIR)
+        dist_root = Path('dist').resolve()
+        previous = Path(DIST_DIR).resolve()
+        if previous.parent != dist_root:
+            raise ValueError(f"輸出目錄不在 dist 中：{previous}")
+        backup = dist_root / f"{APP_NAME}_backup_{datetime.now():%Y%m%d_%H%M%S}"
+        print(f"\n  保留舊版本：{backup}")
+        os.replace(previous, backup)
 
     print("\n[1/4] PyInstaller 打包中（約需 5～15 分鐘）...")
     result = subprocess.run(
-        [sys.executable, "-m", "PyInstaller", SPEC_FILE, "--noconfirm"],
+        [sys.executable, "-m", "PyInstaller", SPEC_FILE, "--noconfirm", "--clean"],
         cwd=os.path.dirname(os.path.abspath(__file__))
     )
 
     if result.returncode != 0:
         print("\n[FAIL] 打包失敗！請查看上方錯誤訊息。")
-        return
+        return False
 
     # ── 產生 manifest ──
     print("\n[2/4] 產生檔案清單 (manifest)...")
@@ -176,9 +224,8 @@ def build():
     new_manifest["manifest.json"] = _hash_file(manifest_in_dist)
 
     # ── 差量更新包 ──
-    old_manifest = _find_previous_manifest(APP_VERSION)
     if old_manifest:
-        create_patch_zip(DIST_DIR, old_manifest, new_manifest)
+        create_patch_zip(DIST_DIR, old_manifest, new_manifest, base_version)
     else:
         print("  [PATCH] 找不到前一版 manifest，無法產生差量更新包（首次打包正常）")
 
@@ -208,6 +255,11 @@ def build():
     print(f'   gh release create v{APP_VERSION} "{OUTPUT_ZIP}" "{PATCH_ZIP}" --title "v{APP_VERSION}" --notes "更新內容"')
     print(f"{'=' * 60}")
 
+    return True
+
 
 if __name__ == "__main__":
-    build()
+    import argparse
+    parser = argparse.ArgumentParser(description='建置小黑工具箱與差量更新包')
+    parser.add_argument('--base-version', help='指定已公開 Release 的差量更新基準版本')
+    sys.exit(0 if build(parser.parse_args().base_version) else 1)

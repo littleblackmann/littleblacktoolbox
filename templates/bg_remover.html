@@ -260,7 +260,7 @@
                 <div id="processingOverlay" class="processing-overlay hidden">
                     <div class="pulse-ring"></div>
                     <p class="text-slate-200 font-semibold mb-1">AI 正在分析圖片...</p>
-                    <p class="text-slate-400 text-sm">首次使用需下載模型，請稍候</p>
+                    <p class="text-slate-400 text-sm">正在載入去背模型，首次使用可能較久</p>
                 </div>
             </div>
         </div>
@@ -286,6 +286,9 @@
 
     let currentFile = null;
     let resultDataUrl = null;
+    let previewUrl = null;
+    let requestId = 0;
+    let sliderInitialized = false;
 
     // ── 拖曳上傳 ──
     dropZone.addEventListener('dragover', (e) => {
@@ -301,7 +304,7 @@
         e.preventDefault();
         dropZone.classList.remove('drag-over');
         const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
+        if (file) {
             handleFile(file);
         }
     });
@@ -311,9 +314,15 @@
     });
 
     function handleFile(file) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+            alert('請選擇 50 MB 以下的 PNG、JPG 或 WebP 圖片');
+            return;
+        }
+        requestId++;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         currentFile = file;
-        const url = URL.createObjectURL(file);
-        originalImg.src = url;
+        previewUrl = URL.createObjectURL(file);
+        originalImg.src = previewUrl;
         uploadPrompt.classList.add('hidden');
         originalPreview.classList.remove('hidden');
         removeBtn.disabled = false;
@@ -323,6 +332,7 @@
         // 重置結果區
         resultView.classList.add('hidden');
         emptyState.classList.remove('hidden');
+        processingOverlay.classList.add('hidden');
 
         lucide.createIcons();
     }
@@ -330,6 +340,8 @@
     // ── 去背處理 ──
     async function processImage() {
         if (!currentFile) return;
+        const selectedFile = currentFile;
+        const selectedRequest = requestId;
 
         removeBtn.disabled = true;
         removeBtn.innerHTML = '<div class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> 處理中...';
@@ -338,7 +350,7 @@
 
         try {
             const formData = new FormData();
-            formData.append('image', currentFile);
+            formData.append('image', selectedFile);
 
             const response = await fetch('/api/remove-bg', {
                 method: 'POST',
@@ -346,6 +358,7 @@
             });
 
             const data = await response.json();
+            if (selectedRequest !== requestId) return;
 
             if (data.success) {
                 resultDataUrl = data.image;
@@ -367,6 +380,7 @@
                 throw new Error(data.error || '處理失敗');
             }
         } catch (err) {
+            if (selectedRequest !== requestId) return;
             processingOverlay.classList.add('hidden');
             emptyState.classList.remove('hidden');
             alert('去背失敗：' + err.message);
@@ -396,8 +410,6 @@
         const beforeImage = document.getElementById('beforeImg');
         const afterImage = document.getElementById('afterImg');
 
-        let isDragging = false;
-
         function updateSlider(x) {
             const rect = slider.getBoundingClientRect();
             let percent = ((x - rect.left) / rect.width) * 100;
@@ -409,29 +421,22 @@
             handle.style.left = percent + '%';
         }
 
-        function onMove(e) {
-            if (!isDragging) return;
-            e.preventDefault();
-            const x = e.touches ? e.touches[0].clientX : e.clientX;
-            updateSlider(x);
-        }
-
-        function onEnd() { isDragging = false; }
-
-        handle.addEventListener('mousedown', () => isDragging = true);
-        handle.addEventListener('touchstart', () => isDragging = true);
-        line.addEventListener('mousedown', () => isDragging = true);
-
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('touchmove', onMove);
-        document.addEventListener('mouseup', onEnd);
-        document.addEventListener('touchend', onEnd);
-
-        // 點擊直接跳到位置
-        slider.addEventListener('click', (e) => {
+        updateSlider(slider.getBoundingClientRect().left + slider.getBoundingClientRect().width / 2);
+        if (sliderInitialized) return;
+        sliderInitialized = true;
+        slider.style.touchAction = 'none';
+        slider.addEventListener('pointerdown', e => {
+            slider.setPointerCapture(e.pointerId);
             updateSlider(e.clientX);
         });
+        slider.addEventListener('pointermove', e => {
+            if (slider.hasPointerCapture(e.pointerId)) updateSlider(e.clientX);
+        });
     }
+
+    window.addEventListener('beforeunload', () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+    });
 
     lucide.createIcons();
 </script>

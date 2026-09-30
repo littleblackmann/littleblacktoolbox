@@ -89,7 +89,7 @@
         .nav-link {
             color: var(--text-dim);
             transition: all 0.2s;
-            padding: 0.5rem 1rem;
+            padding: 0.5rem 0.6rem;
             border-radius: 8px;
             font-size: 0.875rem;
         }
@@ -211,7 +211,7 @@
                             </div>
                             <span class="nav-logo font-bold text-lg tracking-tight">小黑工具箱</span>
                         </a>
-                        <div class="hidden md:flex items-center gap-1">
+                        <div class="hidden xl:flex items-center gap-1">
                             <a href="/" class="nav-link {% block nav_home %}{% endblock %}">
                                 <span class="flex items-center gap-1.5"><i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> 首頁</span>
                             </a>
@@ -230,11 +230,22 @@
                             <a href="/tool/ocr" class="nav-link {% block nav_ocr %}{% endblock %}">
                                 <span class="flex items-center gap-1.5"><i data-lucide="scan-text" class="w-3.5 h-3.5"></i> OCR</span>
                             </a>
+                            <a href="/tool/image-workshop" class="nav-link {% block nav_image %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="images" class="w-3.5 h-3.5"></i> 圖片處理</span>
+                            </a>
+                            <a href="/tool/pdf-workshop" class="nav-link {% block nav_pdf %}{% endblock %}">
+                                <span class="flex items-center gap-1.5"><i data-lucide="files" class="w-3.5 h-3.5"></i> PDF</span>
+                            </a>
                         </div>
+                        <select aria-label="切換工具" class="xl:hidden bg-slate-900 border border-slate-700 rounded-lg text-xs p-2 max-w-28" onchange="location.href=this.value">
+                            {% for path, label in [('/', '工具首頁'), ('/tool/bg-remover', 'AI 去背'), ('/tool/png-to-ico', 'PNG 轉 ICO'), ('/tool/text-converter', '文字轉檔'), ('/tool/qrcode', 'QR Code'), ('/tool/ocr', 'OCR'), ('/tool/image-workshop', '圖片處理'), ('/tool/pdf-workshop', 'PDF 工具')] %}
+                            <option value="{{ path }}" {% if request.path == path %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
                     </div>
                     <div class="flex items-center gap-2 text-xs text-slate-500">
                         <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
-                        <span class="hidden sm:inline">完全離線運作</span>
+                        <span class="hidden 2xl:inline">工具離線可用</span>
                     </div>
                 </div>
             </div>
@@ -303,9 +314,13 @@
                 } else {
                     btn.textContent = '更新失敗';
                     document.getElementById('update-msg').textContent = data.error || '更新失敗';
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
                 }
             } catch(e) {
                 btn.textContent = '更新失敗';
+                btn.disabled = false;
+                btn.style.opacity = '1';
             }
         }
     </script>

@@ -187,6 +187,8 @@
     const sizePreviewGrid = document.getElementById('sizePreviewGrid');
 
     let currentImage = null;
+    let currentFileName = 'image';
+    let loadId = 0;
 
     // 拖曳支援
     uploadZone.addEventListener('dragover', (e) => {
@@ -208,11 +210,24 @@
     });
 
     function loadImage(file) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+            alert('請選擇 50 MB 以下的 PNG、JPG 或 WebP 圖片');
+            return;
+        }
+        const selectedLoad = ++loadId;
+        currentImage = null;
+        convertBtn.disabled = true;
         const reader = new FileReader();
         reader.onload = (event) => {
             const img = new Image();
             img.onload = () => {
+                if (selectedLoad !== loadId) return;
+                if (img.width * img.height > 30_000_000) {
+                    alert('圖片解析度過高（上限 3000 萬像素）');
+                    return;
+                }
                 currentImage = img;
+                currentFileName = file.name.replace(/\.[^.]+$/, '') || 'image';
                 imagePreview.src = event.target.result;
                 uploadPrompt.classList.add('hidden');
                 imagePreviewContainer.classList.remove('hidden');
@@ -226,8 +241,10 @@
                 convertBtn.innerHTML = '<i data-lucide="package" class="w-5 h-5"></i> 打包並下載 ICO 檔';
                 lucide.createIcons();
             };
+            img.onerror = () => alert('圖片檔案無法讀取');
             img.src = event.target.result;
         };
+        reader.onerror = () => alert('圖片檔案讀取失敗');
         reader.readAsDataURL(file);
     }
 
@@ -267,7 +284,7 @@
 
     // Canvas resize + ICO 打包邏輯
     function getResizedPngBlob(img, size) {
-        return new Promise((resolve) => {
+        return new Promise((resolve, reject) => {
             const canvas = document.createElement('canvas');
             canvas.width = size;
             canvas.height = size;
@@ -284,7 +301,8 @@
             ctx.drawImage(img, x, y, w, h);
 
             canvas.toBlob((blob) => {
-                resolve({ size, blob });
+                if (blob) resolve({ size, blob });
+                else reject(new Error('無法產生 PNG 圖片'));
             }, 'image/png');
         });
     }
@@ -366,17 +384,18 @@
             const url = URL.createObjectURL(icoBlob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '小黑_Icon.ico';
+            a.download = currentFileName + '.ico';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
 
             statusMsg.classList.remove('hidden');
             convertBtn.innerHTML = '<i data-lucide="check-circle" class="w-5 h-5"></i> 下載完成';
             lucide.createIcons();
 
             setTimeout(() => {
+                if (!currentImage) return;
                 convertBtn.disabled = false;
                 convertBtn.innerHTML = '<i data-lucide="package" class="w-5 h-5"></i> 再次打包下載';
                 lucide.createIcons();

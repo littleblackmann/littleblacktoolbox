@@ -12,9 +12,7 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
-from pathlib import Path
 from urllib.request import urlopen, Request
-from urllib.error import URLError
 
 # ── 路徑設定 ──────────────────────────────────────────────────────
 
@@ -27,36 +25,61 @@ else:
 
 GITHUB_OWNER = "littleblackmann"
 GITHUB_REPO = "littleblacktoolbox"
+APP_NAME = "小黑工具箱"
 
 VERSION_FILE = os.path.join(APP_ROOT, "version.json")
 
 
 def _get_ssl_context():
-    """取得 SSL context，Win10 舊版可能需要跳過驗證"""
+    """Use the system trust store and certifi when available."""
+    ctx = ssl.create_default_context()
     try:
-        ctx = ssl.create_default_context()
-        try:
-            import certifi
-            ctx.load_verify_locations(certifi.where())
-        except ImportError:
-            pass
-        return ctx
-    except Exception:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        return ctx
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+    except ImportError:
+        pass
+    return ctx
 
 
 def _urlopen_safe(req, timeout=30):
-    """urlopen 的安全包裝，自動處理 Win10 SSL 問題"""
-    try:
-        return urlopen(req, timeout=timeout)
-    except (URLError, ssl.SSLError):
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-        return urlopen(req, timeout=timeout, context=ctx)
+    """Never download executable updates without TLS certificate checks."""
+    return urlopen(req, timeout=timeout, context=_get_ssl_context())
+
+
+def _validate_archive(zf: zipfile.ZipFile, new_version: str, is_patch: bool) -> None:
+    """Reject unsafe or incompatible releases before extracting any files."""
+    prefix = APP_NAME + '/'
+    names = set()
+    total_size = 0
+    for member in zf.infolist():
+        name = member.filename.replace('\\', '/')
+        parts = name.split('/')
+        if (not name.startswith(prefix) or name.startswith('/') or
+                any(part in ('', '.', '..') for part in parts[:-1]) or
+                ':' in name or member.is_dir() and parts[-1] not in ('',)):
+            raise ValueError('更新檔包含不安全的路徑')
+        if (member.external_attr >> 16) & 0o170000 == 0o120000:
+            raise ValueError('更新檔包含不支援的符號連結')
+        key = name.casefold()
+        if key in names:
+            raise ValueError('更新檔包含重複檔案')
+        names.add(key)
+        total_size += member.file_size
+        if total_size > 6 * 1024 * 1024 * 1024:
+            raise ValueError('更新檔解壓後過大')
+    if prefix + '_internal/version.json' not in zf.namelist():
+        raise ValueError('更新檔缺少版本資訊')
+    version = json.loads(zf.read(prefix + '_internal/version.json')).get('version')
+    if version != new_version:
+        raise ValueError('更新檔版本與 Release 不符')
+    if is_patch:
+        metadata_name = prefix + 'patch_info.json'
+        if metadata_name not in zf.namelist():
+            raise ValueError('差量更新缺少基準版本資訊')
+        metadata = json.loads(zf.read(metadata_name))
+        if (metadata.get('from_version') != get_current_version() or
+                metadata.get('to_version') != new_version):
+            raise ValueError('差量更新不適用於目前版本')
 
 
 def get_current_version() -> str:
@@ -157,6 +180,9 @@ def download_and_apply(download_url: str, new_version: str,
         True: 更新腳本已啟動，需要退出程式
         False: 更新失敗
     """
+    if not getattr(sys, 'frozen', False):
+        return False
+
     tmp_dir = tempfile.mkdtemp(prefix="toolbox_update_")
     zip_path = os.path.join(tmp_dir, "update.zip")
 
@@ -181,6 +207,7 @@ def download_and_apply(download_url: str, new_version: str,
         # ── 解壓 ──
         extract_dir = os.path.join(tmp_dir, "extracted")
         with zipfile.ZipFile(zip_path, "r") as zf:
+            _validate_archive(zf, new_version, is_patch)
             zf.extractall(extract_dir)
 
         # 找到實際程式根目錄（可能在子資料夾裡）

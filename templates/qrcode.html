@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}QR Code 生成器 — 小黑工具箱{% endblock %}
+{% block title %}QR Code 產生與辨識 — 小黑工具箱{% endblock %}
 {% block nav_qr %}active{% endblock %}
 
 {% block extra_css %}
@@ -43,6 +43,9 @@
     background: rgba(15, 23, 42, 0.4);
     border: 2px dashed rgba(71, 85, 105, 0.4);
 }
+
+#qrOutput { max-width: 100%; }
+#qrOutput canvas, #qrOutput img { max-width: 100%; height: auto; }
 
 /* 快捷模板按鈕 */
 .template-btn {
@@ -142,6 +145,7 @@
 {% endblock %}
 
 {% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/workshops.css') }}">
 <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
 
     <!-- 頁面標題 -->
@@ -151,14 +155,15 @@
                 <i data-lucide="qr-code" class="w-5 h-5 text-white"></i>
             </div>
             <div>
-                <h1 class="text-2xl font-bold text-slate-100">QR Code 生成器</h1>
-                <p class="text-sm text-slate-400">輸入任何文字或網址，即時產生 QR Code</p>
+                <h1 class="text-2xl font-bold text-slate-100">QR Code 產生與辨識</h1>
+                <p class="text-sm text-slate-400">產生 QR Code，或從圖片中讀取內容</p>
             </div>
         </div>
     </div>
 
+    <div class="flex gap-3 mb-5"><a href="#qrGenerate" class="tool-secondary">產生 QR Code</a><a href="#qrScan" class="tool-secondary">辨識 QR 圖片</a></div>
     <!-- 主要內容區 -->
-    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div id="qrGenerate" class="grid grid-cols-1 lg:grid-cols-2 gap-6" style="scroll-margin-top:80px;">
 
         <!-- 左側：輸入區 -->
         <div class="flex flex-col gap-4 animate-in animate-delay-1">
@@ -186,7 +191,7 @@
 
                 <!-- 輸入框 -->
                 <textarea id="qrInput" class="input-area" placeholder="輸入網址、文字、電話號碼..." oninput="onInputChange()"></textarea>
-                <div id="charCount" class="char-count">0 / 2953 字元</div>
+                <div id="charCount" class="char-count">0 / 1273 bytes</div>
 
                 <!-- 自訂選項 -->
                 <div class="mt-5">
@@ -277,7 +282,7 @@
                     </button>
                     <button class="btn-primary justify-center"
                             style="background: linear-gradient(135deg, #6366f1, #4f46e5); box-shadow: 0 4px 20px rgba(99,102,241,0.25);"
-                            onclick="copyQR()">
+                            onclick="copyQR(event)">
                         <i data-lucide="clipboard-copy" class="w-5 h-5"></i>
                         複製
                     </button>
@@ -294,10 +299,24 @@
         </div>
 
     </div>
+    <section id="qrScan" class="glass p-6 mt-8" style="scroll-margin-top:80px;">
+        <h2 class="text-xl font-bold mb-2">辨識 QR 圖片</h2>
+        <p class="text-sm text-slate-400 mb-5">拖入圖片、選擇檔案或 Ctrl+V 貼上截圖。辨識後可複製內容，也能自行開啟網址。</p>
+        <div class="grid md:grid-cols-2 gap-5">
+            <div><input id="qrScanFile" type="file" accept="image/png,image/jpeg,image/webp" class="hidden">
+                <div id="qrScanDrop" class="tool-drop" tabindex="0" role="button" aria-label="選擇 QR 圖片"><i data-lucide="scan-line" class="w-9 h-9 mx-auto mb-3 text-amber-400"></i><p class="text-slate-200">拖入 QR 圖片，或點擊選擇</p><p class="text-xs mt-2">PNG／JPG／WebP · 一次一張，支援同圖多個 QR</p></div>
+                <img id="qrScanPreview" class="hidden max-h-64 max-w-full mx-auto mt-4 rounded-lg" alt="QR 圖片預覽">
+                <div class="flex items-center gap-3 mt-3"><span id="qrScanName" class="text-xs text-slate-500 break-all flex-1"></span><button id="qrScanClear" class="tool-secondary" disabled>清空</button></div>
+            </div>
+            <div><p id="qrScanMessage" class="tool-message text-slate-400" role="status" aria-live="polite"></p><div id="qrScanResults" class="space-y-3 mt-3"></div></div>
+        </div>
+    </section>
 </div>
 {% endblock %}
 
 {% block extra_js %}
+<script src="{{ url_for('static', filename='js/tool-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/qr-scanner.js') }}"></script>
 <script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
 <script>
     // ── 全域變數 ──
@@ -318,6 +337,17 @@
     const fgColorLabel = document.getElementById('fgColorLabel');
     const bgColorLabel = document.getElementById('bgColorLabel');
 
+    function resetQR() {
+        qrOutput.textContent = '';
+        qrOutput.classList.add('hidden');
+        emptyState.classList.remove('hidden');
+        qrPreview.classList.add('empty');
+        qrPreview.style.background = '';
+        downloadBtns.classList.add('hidden');
+        scanTip.classList.add('hidden');
+        qrInstance = null;
+    }
+
     // ── 快捷模板 ──
     function setTemplate(type) {
         const templates = {
@@ -335,11 +365,12 @@
 
     // ── 輸入變化 ──
     function onInputChange() {
-        const len = qrInput.value.length;
-        charCount.textContent = `${len} / 2953 字元`;
-        charCount.className = 'char-count' + (len > 2500 ? ' danger' : len > 2000 ? ' warning' : '');
+        const bytes = new TextEncoder().encode(qrInput.value).length;
+        charCount.textContent = `${bytes} / 1273 bytes`;
+        charCount.className = 'char-count' + (bytes > 1273 ? ' danger' : bytes > 1000 ? ' warning' : '');
 
-        generateBtn.disabled = len === 0;
+        generateBtn.disabled = !qrInput.value.trim() || bytes > 1273;
+        resetQR();
 
         // 更新顏色標籤
         fgColorLabel.textContent = fgColor.value.toUpperCase();
@@ -351,31 +382,38 @@
         currentSize = size;
         document.querySelectorAll('.size-option').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
+        resetQR();
     }
 
     // ── 生成 QR Code ──
     function generateQR() {
         const text = qrInput.value.trim();
         if (!text) return;
+        if (fgColor.value.toLowerCase() === bgColor.value.toLowerCase()) {
+            alert('QR Code 與背景顏色不能相同');
+            return;
+        }
 
-        // 清除舊的
-        qrOutput.innerHTML = '';
+        resetQR();
+        try {
+            qrInstance = new QRCode(qrOutput, {
+                text: text,
+                width: currentSize,
+                height: currentSize,
+                colorDark: fgColor.value,
+                colorLight: bgColor.value,
+                correctLevel: QRCode.CorrectLevel.H
+            });
+        } catch (error) {
+            resetQR();
+            alert('內容過長，無法產生 QR Code。請縮短文字後再試。');
+            return;
+        }
 
-        // 顯示結果區
         emptyState.classList.add('hidden');
         qrOutput.classList.remove('hidden');
         qrPreview.classList.remove('empty');
         qrPreview.style.background = bgColor.value;
-
-        // 生成新的 QR Code
-        qrInstance = new QRCode(qrOutput, {
-            text: text,
-            width: currentSize,
-            height: currentSize,
-            colorDark: fgColor.value,
-            colorLight: bgColor.value,
-            correctLevel: QRCode.CorrectLevel.H  // 最高容錯
-        });
 
         // 顯示下載區
         downloadBtns.classList.remove('hidden');
@@ -384,9 +422,25 @@
         lucide.createIcons();
     }
 
+    // Preserve a four-module quiet zone in downloaded/copied QR images.
+    function exportQRCanvas() {
+        const source = qrOutput.querySelector('canvas');
+        if (!source) return null;
+        const modules = qrInstance?._oQRCode?.getModuleCount?.() || 33;
+        const margin = Math.ceil(source.width / modules * 4);
+        const canvas = document.createElement('canvas');
+        canvas.width = source.width + margin * 2;
+        canvas.height = source.height + margin * 2;
+        const context = canvas.getContext('2d');
+        context.fillStyle = bgColor.value;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(source, margin, margin);
+        return canvas;
+    }
+
     // ── 下載 PNG ──
     function downloadQR(format) {
-        const canvas = qrOutput.querySelector('canvas');
+        const canvas = exportQRCanvas();
         if (!canvas) return;
 
         const link = document.createElement('a');
@@ -398,8 +452,8 @@
     }
 
     // ── 複製到剪貼簿 ──
-    async function copyQR() {
-        const canvas = qrOutput.querySelector('canvas');
+    async function copyQR(e) {
+        const canvas = exportQRCanvas();
         if (!canvas) return;
 
         try {
@@ -409,7 +463,7 @@
             ]);
 
             // 複製成功提示
-            const btn = event.target.closest('button');
+            const btn = e.target.closest('button');
             const originalHTML = btn.innerHTML;
             btn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i> 已複製！';
             btn.style.background = 'linear-gradient(135deg, #10b981, #059669)';

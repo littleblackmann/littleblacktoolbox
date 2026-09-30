@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}PDF 工具 — 小黑工具箱{% endblock %}
+{% block nav_pdf %}active{% endblock %}
+{% block content %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/workshops.css') }}">
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <a href="/" class="back-btn mb-5"><i data-lucide="arrow-left" class="w-4 h-4"></i> 返回工具箱</a>
+    <h1 class="text-3xl font-bold mb-2">PDF 工具</h1>
+    <p class="text-slate-400 mb-7">加入文件，勾選需要的頁面，拖曳排序或旋轉後，合併下載或逐頁拆分。</p>
+    <section class="glass p-5 mb-5">
+        <input id="pdfFiles" type="file" accept="application/pdf,.pdf" multiple class="hidden">
+        <div id="pdfDrop" class="tool-drop" tabindex="0" role="button" aria-label="選擇 PDF"><i data-lucide="files" class="w-9 h-9 mx-auto mb-3 text-rose-400"></i><p class="font-medium text-slate-200">拖入 PDF，或點擊選擇文件</p><p class="text-xs mt-2">最多 20 個檔案 · 合計 50 MB、500 頁 · 可輸入密碼開啟受保護文件</p></div>
+        <div id="pdfDocuments" class="space-y-2 mt-4"></div>
+        <p id="pdfMessage" class="tool-message text-slate-400" role="status" aria-live="polite"></p>
+    </section>
+    <section class="glass p-5 mb-5">
+        <fieldset id="pdfSettings">
+            <div class="flex flex-wrap gap-3 mb-4 items-center"><strong id="pdfSummary" class="text-sm text-slate-300 mr-auto">尚未加入文件</strong><button id="selectAllPdf" class="tool-secondary" disabled>全選</button><button id="deselectAllPdf" class="tool-secondary" disabled>全部取消</button><button id="clearPdf" class="tool-secondary" disabled>清空文件</button></div>
+            <div class="flex flex-wrap items-end gap-3 mb-4"><div class="flex-1 min-w-0"><label for="pdfRange" class="tool-label">快速選頁與排序</label><input id="pdfRange" class="tool-field" placeholder="例如 1-3,6,5 或 4-1"></div><button id="applyPdfRange" class="tool-secondary" disabled>套用頁碼</button></div>
+            <p class="text-xs text-slate-500 mb-5">使用卡片左上角的排列序號。輸入順序就是輸出順序；例如 3,1-2 會先放第 3 頁。也可用卡片的箭頭或拖曳調整。</p>
+            <div class="grid md:grid-cols-3 gap-4"><div><label for="pdfMode" class="tool-label">輸出方式</label><select id="pdfMode" class="tool-field"><option value="combine">合併／抽取為一份 PDF</option><option value="split">每頁拆成 PDF，打包 ZIP</option></select></div><div><label for="pdfName" class="tool-label">輸出檔名</label><input id="pdfName" class="tool-field" value="整理後文件" maxlength="120"></div><button id="processPdf" class="btn-primary justify-center self-end" disabled>下載處理結果</button></div>
+        </fieldset>
+        <p class="text-xs text-slate-500 mt-4">僅輸出勾選的頁面，原始文件保留。新文件不保留開啟密碼；編輯已簽署文件會使原數位簽章失效。</p>
+    </section>
+    <div id="pdfPages" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"></div>
+</div>
+<dialog id="pdfPasswordDialog" class="glass p-6 text-slate-200 w-80 fixed" style="margin:auto;background:#111827;">
+    <form id="pdfPasswordForm">
+        <h2 class="font-bold mb-2">輸入 PDF 開啟密碼</h2><p id="pdfPasswordName" class="text-sm text-slate-400 break-all mb-4"></p>
+        <label for="pdfPassword" class="tool-label">密碼</label><input id="pdfPassword" type="password" class="tool-field mb-4" autocomplete="off">
+        <div class="flex gap-3 justify-end"><button id="pdfPasswordCancel" type="button" class="tool-secondary">略過文件</button><button type="submit" class="btn-primary">開啟</button></div>
+    </form>
+</dialog>
+{% endblock %}
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/pdf.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/tool-ui.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pdf-workshop.js') }}"></script>
+{% endblock %}

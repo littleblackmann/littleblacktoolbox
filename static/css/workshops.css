@@ -1,0 +1,20 @@
+.tool-drop { border: 2px dashed #334155; border-radius: 14px; padding: 1.6rem; text-align: center; color: #94a3b8; cursor: pointer; transition: .2s; }
+.tool-drop:hover, .tool-drop:focus-visible, .tool-drop.drag-active { border-color: #60a5fa; background: rgba(59,130,246,.08); outline: none; }
+.tool-field { display: block; width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: .6rem .7rem; color: #e2e8f0; }
+.tool-field:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
+.tool-label { display: block; color: #94a3b8; font-size: .875rem; margin-bottom: .4rem; }
+.tool-secondary { padding: .5rem .8rem; border: 1px solid #334155; background: #111827; border-radius: 8px; color: #cbd5e1; cursor: pointer; font-size: .875rem; }
+.tool-secondary:hover { border-color: #60a5fa; color: #f1f5f9; }
+.tool-secondary:disabled { opacity: .4; cursor: not-allowed; }
+.tool-message { min-height: 1.5rem; margin-top: .8rem; font-size: .875rem; overflow-wrap: anywhere; }
+.image-row { padding: 1rem; border: 1px solid #1e293b; border-radius: 12px; background: rgba(15,23,42,.5); }
+.image-thumbs { display: flex; gap: .6rem; }
+.image-thumbs img { width: 76px; height: 76px; object-fit: contain; border-radius: 8px; }
+.pdf-card { border: 1px solid #334155; border-radius: 12px; padding: .7rem; background: #0f172a; cursor: grab; }
+.pdf-card.excluded { opacity: .45; }
+.pdf-card.drag-target { border-color: #60a5fa; box-shadow: 0 0 0 2px #3b82f6; }
+.pdf-thumb { height: 155px; display: flex; align-items: center; justify-content: center; overflow: hidden; margin-bottom: .6rem; background: #1e293b; border-radius: 6px; }
+.pdf-thumb canvas { max-width: 100%; max-height: 100%; object-fit: contain; }
+.qr-result { border: 1px solid #334155; border-radius: 12px; padding: 1rem; background: #0f172a; }
+.qr-result pre { white-space: pre-wrap; overflow-wrap: anywhere; font-family: Consolas, monospace; font-size: .875rem; color: #e2e8f0; }
+@media (max-width: 480px) { .image-thumbs img { width: 55px; height: 55px; } }

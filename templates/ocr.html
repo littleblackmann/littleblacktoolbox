@@ -201,7 +201,7 @@
                 <div class="mt-4">
                     <label class="text-xs text-slate-400 mb-2 block flex items-center gap-1.5">
                         <i data-lucide="languages" class="w-3.5 h-3.5"></i>
-                        辨識語言（可多選）
+                        辨識語言（選一種主語言，可搭配英文）
                     </label>
                     <div class="flex flex-wrap gap-2">
                         <button class="lang-option active" data-lang="ch_tra" onclick="toggleLang(this)">繁體中文</button>
@@ -212,7 +212,7 @@
                     </div>
                     <p class="text-xs text-slate-500 mt-2">
                         <i data-lucide="info" class="w-3 h-3 inline"></i>
-                        選越少語言，辨識越快越準確
+                        EasyOCR 一次支援一種中／日／韓語言，可另外選英文
                     </p>
                 </div>
 
@@ -275,7 +275,7 @@
                 <div id="resultBtns" class="hidden flex gap-3 mt-4">
                     <button class="btn-primary flex-1 justify-center"
                             style="background: linear-gradient(135deg, #10b981, #059669); box-shadow: 0 4px 20px rgba(16,185,129,0.25);"
-                            onclick="copyResult()">
+                            onclick="copyResult(event)">
                         <i data-lucide="clipboard-copy" class="w-5 h-5"></i>
                         複製全部
                     </button>
@@ -291,7 +291,7 @@
                 <div id="processingOverlay" class="processing-overlay hidden">
                     <div class="pulse-ring"></div>
                     <p class="text-slate-200 font-semibold mb-1">AI 正在辨識文字...</p>
-                    <p class="text-slate-400 text-sm" id="processingTip">首次使用需下載模型，請稍候</p>
+                    <p class="text-slate-400 text-sm" id="processingTip">正在載入辨識模型，首次使用可能較久</p>
                 </div>
             </div>
         </div>
@@ -317,6 +317,8 @@
     const processingTip = document.getElementById('processingTip');
 
     let currentFile = null;
+    let previewUrl = null;
+    let requestId = 0;
 
     // ── 拖曳上傳 ──
     dropZone.addEventListener('dragover', (e) => {
@@ -332,7 +334,7 @@
         e.preventDefault();
         dropZone.classList.remove('drag-over');
         const file = e.dataTransfer.files[0];
-        if (file && file.type.startsWith('image/')) {
+        if (file) {
             handleFile(file);
         }
     });
@@ -356,9 +358,15 @@
 
     // ── 處理檔案 ──
     function handleFile(file) {
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 50 * 1024 * 1024) {
+            alert('請選擇 50 MB 以下的 PNG、JPG 或 WebP 圖片');
+            return;
+        }
+        requestId++;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
         currentFile = file;
-        const url = URL.createObjectURL(file);
-        previewImg.src = url;
+        previewUrl = URL.createObjectURL(file);
+        previewImg.src = previewUrl;
         uploadPrompt.classList.add('hidden');
         imagePreview.classList.remove('hidden');
         dropZone.classList.add('has-image');
@@ -370,12 +378,18 @@
         resultText.classList.add('hidden');
         resultBtns.classList.add('hidden');
         resultStats.classList.add('hidden');
+        processingOverlay.classList.add('hidden');
 
         lucide.createIcons();
     }
 
     // ── 語言選擇 ──
     function toggleLang(btn) {
+        if (btn.dataset.lang !== 'en' && !btn.classList.contains('active')) {
+            document.querySelectorAll('.lang-option.active').forEach(option => {
+                if (option.dataset.lang !== 'en') option.classList.remove('active');
+            });
+        }
         btn.classList.toggle('active');
         // 至少要選一個
         const actives = document.querySelectorAll('.lang-option.active');
@@ -392,6 +406,8 @@
     // ── 開始 OCR ──
     async function startOCR() {
         if (!currentFile) return;
+        const selectedFile = currentFile;
+        const selectedRequest = requestId;
 
         const langs = getSelectedLangs();
         const startTime = Date.now();
@@ -406,7 +422,7 @@
 
         try {
             const formData = new FormData();
-            formData.append('image', currentFile);
+            formData.append('image', selectedFile);
             formData.append('languages', JSON.stringify(langs));
 
             const response = await fetch('/api/ocr', {
@@ -415,6 +431,7 @@
             });
 
             const data = await response.json();
+            if (selectedRequest !== requestId) return;
 
             if (data.success) {
                 const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -437,6 +454,7 @@
                 throw new Error(data.error || '辨識失敗');
             }
         } catch (err) {
+            if (selectedRequest !== requestId) return;
             processingOverlay.classList.add('hidden');
             emptyState.classList.remove('hidden');
             alert('辨識失敗：' + err.message);
@@ -447,13 +465,13 @@
     }
 
     // ── 複製結果 ──
-    async function copyResult() {
+    async function copyResult(e) {
         const text = resultText.value;
         if (!text) return;
 
         try {
             await navigator.clipboard.writeText(text);
-            const btn = event.target.closest('button');
+            const btn = e.target.closest('button');
             const orig = btn.innerHTML;
             btn.innerHTML = '<i data-lucide="check" class="w-5 h-5"></i> 已複製！';
             lucide.createIcons();
@@ -482,11 +500,15 @@
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
 
     // ── 清除全部 ──
     function clearAll() {
+        requestId++;
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+        previewImg.removeAttribute('src');
         currentFile = null;
         fileInput.value = '';
         uploadPrompt.classList.remove('hidden');
@@ -501,9 +523,14 @@
         resultText.value = '';
         resultBtns.classList.add('hidden');
         resultStats.classList.add('hidden');
+        processingOverlay.classList.add('hidden');
 
         lucide.createIcons();
     }
+
+    window.addEventListener('beforeunload', () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+    });
 
     lucide.createIcons();
 </script>
