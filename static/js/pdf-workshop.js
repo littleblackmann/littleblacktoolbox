@@ -1,4 +1,5 @@
 (() => {
+    ToolPrefs.fields('pdf.settings', ['pdfMode']);
     const $ = id => document.getElementById(id);
     pdfjsLib.GlobalWorkerOptions.workerSrc = '/static/js/pdf.worker.min.js';
     let documents = [], pages = [], busy = false, nextId = 0, dragged = null;

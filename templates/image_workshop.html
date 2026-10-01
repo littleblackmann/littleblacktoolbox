@@ -11,6 +11,7 @@
         <section class="glass p-5 md:col-span-1">
             <h2 class="font-semibold mb-4">處理設定</h2>
             <fieldset id="imageSettings" class="space-y-4">
+                <div><label for="imageRecipe" class="tool-label">快速套用流程</label><select id="imageRecipe" class="tool-field"><option value="custom">自訂設定</option><option value="share">分享圖片：1280 px／WebP</option><option value="transparent">去背 → 1280 px → WebP</option></select></div>
                 <div><label for="imageFormat" class="tool-label">輸出格式</label><select id="imageFormat" class="tool-field"><option value="same">維持原格式</option><option value="WEBP">WebP（體積較小，支援透明）</option><option value="JPEG">JPG（適合照片）</option><option value="PNG">PNG（無損，支援透明）</option></select></div>
                 <div><label for="imagePreset" class="tool-label">常用尺寸</label><select id="imagePreset" class="tool-field"><option value="0">原尺寸</option><option value="1920">網頁／分享：最長邊 1920 px</option><option value="1280">一般上傳：最長邊 1280 px</option><option value="800">小圖：最長邊 800 px</option><option value="custom">自訂尺寸</option></select></div>
                 <div class="grid grid-cols-2 gap-3"><div><label for="imageWidth" class="tool-label">最大寬度 px</label><input id="imageWidth" class="tool-field" type="number" min="0" max="10000" value="0"></div><div><label for="imageHeight" class="tool-label">最大高度 px</label><input id="imageHeight" class="tool-field" type="number" min="0" max="10000" value="0"></div></div>
@@ -19,10 +20,13 @@
                 <div><label for="imageBackground" class="tool-label">透明圖片轉 JPG 的背景色</label><input id="imageBackground" type="color" value="#ffffff" class="w-full h-9 rounded cursor-pointer"></div>
                 <label class="flex gap-2 text-sm text-slate-400"><input id="imageMetadata" type="checkbox" class="accent-blue-500"> 保留拍攝資訊與色彩描述檔</label>
                 <p class="text-xs text-slate-500">預設移除 EXIF 等拍攝資訊；保留時可能包含 GPS 位置。</p>
+                <label class="flex gap-2 text-sm text-slate-300"><input id="imageRemoveBg" type="checkbox" class="accent-blue-500"> 先以 AI 移除背景</label><p class="text-xs text-slate-400">去背後再縮圖與轉檔，圖片較多時需要更多時間。</p>
+                <div><label for="imageRecipeName" class="tool-label">儲存這組設定</label><div class="flex gap-2"><input id="imageRecipeName" class="tool-field min-w-0" maxlength="40" placeholder="例如：商品小圖"><button id="saveImageRecipe" type="button" class="tool-secondary shrink-0">儲存</button></div></div>
             </fieldset>
             <button id="processImages" class="btn-primary w-full justify-center mt-6" disabled>開始批次處理</button>
             <button id="cancelImages" class="tool-secondary w-full mt-2 hidden">停止處理</button>
-            <p id="imageMessage" class="tool-message text-slate-400" role="status" aria-live="polite"></p>
+            <button id="retryImages" class="tool-secondary w-full mt-2 hidden">重試失敗圖片</button>
+            <progress id="imageProgress" class="w-full mt-3 hidden" max="1" value="0" aria-label="圖片處理進度"></progress><p id="imageMessage" class="tool-message text-slate-400" role="status" aria-live="polite"></p>
         </section>
         <section class="glass p-5 md:col-span-2">
             <input id="imageFiles" type="file" accept="image/png,image/jpeg,image/webp" multiple class="hidden">

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}批次檔案改名 — 小黑工具箱{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <a href="/" class="back-btn mb-4"><i data-lucide="arrow-left" class="w-4 h-4"></i> 返回工具箱</a>
+    <h1 class="text-3xl font-bold mb-2">批次檔案改名</h1><p class="text-slate-400 mb-6">選擇資料夾，預覽新舊檔名，再執行改名。僅處理這一層的檔案。</p>
+    <section class="glass p-5 mb-5">
+        <label for="renameFolder" class="tool-label">資料夾完整路徑</label>
+        <div class="flex flex-wrap gap-2"><input id="renameFolder" class="tool-field flex-1 min-w-0" placeholder="例如 E:\照片\旅行"><button id="chooseRenameFolder" class="tool-secondary">選擇資料夾</button><button id="loadRenameFolder" class="btn-primary">讀取檔案</button></div>
+        <p class="text-xs text-slate-400 mt-3">檔案在本機直接改名；保留副檔名，不處理子資料夾或連結，不覆寫現有檔案。</p>
+    </section>
+    <div class="grid lg:grid-cols-3 gap-5">
+        <section class="glass p-5">
+            <h2 class="font-semibold mb-4">命名規則</h2>
+            <fieldset id="renameSettings" class="space-y-4">
+                <div><label for="renameMode" class="tool-label">命名方式</label><select id="renameMode" class="tool-field"><option value="keep">保留原名稱／取代文字</option><option value="sequence">基本名稱＋流水號</option></select></div>
+                <div id="renameKeep" class="grid grid-cols-2 gap-3"><div><label for="renameFind" class="tool-label">尋找文字</label><input id="renameFind" class="tool-field" maxlength="150"></div><div><label for="renameReplace" class="tool-label">取代成</label><input id="renameReplace" class="tool-field" maxlength="150"></div></div>
+                <div id="renameSequence" class="hidden space-y-3"><div><label for="renameBase" class="tool-label">基本名稱</label><input id="renameBase" class="tool-field" value="照片" maxlength="150"></div><div class="grid grid-cols-2 gap-3"><div><label for="renameStart" class="tool-label">起始流水號</label><input id="renameStart" class="tool-field" type="number" value="1" min="0" max="999999"></div><div><label for="renameDigits" class="tool-label">流水號位數</label><select id="renameDigits" class="tool-field">{% for n in range(1,7) %}<option value="{{n}}" {% if n==3 %}selected{% endif %}>{{n}} 位</option>{% endfor %}</select></div></div></div>
+                <div class="grid grid-cols-2 gap-3"><div><label for="renamePrefix" class="tool-label">名稱前綴</label><input id="renamePrefix" class="tool-field" maxlength="150"></div><div><label for="renameSuffix" class="tool-label">名稱後綴</label><input id="renameSuffix" class="tool-field" maxlength="150"></div></div>
+                <div><label for="renameDate" class="tool-label">加上日期</label><select id="renameDate" class="tool-field"><option value="none">不加入</option><option value="today">今天日期（YYYYMMDD）</option><option value="modified">各檔案的修改日期</option></select></div>
+            </fieldset>
+            <button id="previewRename" class="btn-primary w-full justify-center mt-5" disabled>預覽新檔名</button>
+            <button id="applyRename" class="tool-secondary w-full mt-2" disabled>執行改名</button>
+            <p id="renameMessage" class="tool-message" role="status" aria-live="polite"></p>
+        </section>
+        <section class="glass p-5 lg:col-span-2 min-w-0">
+            <div class="flex flex-wrap justify-between gap-3 mb-4"><h2 id="renameSummary" class="font-semibold">尚未讀取檔案</h2><div class="flex gap-2"><button id="renameSelectAll" class="tool-secondary">全選</button><button id="renameSelectNone" class="tool-secondary">取消全選</button></div></div>
+            <label for="renameFilter" class="tool-label">依檔名篩選</label><input id="renameFilter" class="tool-field mb-4" placeholder="例如 .jpg 或 截圖">
+            <div class="overflow-auto max-h-[560px]"><table class="rename-table w-full text-sm"><thead><tr><th>選取</th><th>原檔名</th><th>新檔名</th></tr></thead><tbody id="renameRows"></tbody></table></div>
+            <p id="renameEmpty" class="text-slate-400 text-sm py-8 text-center">加入資料夾後，檔案會顯示在這裡。</p>
+        </section>
+    </div>
+    <section class="glass p-5 mt-5"><h2 class="font-semibold mb-2">改名紀錄與復原</h2><p class="text-xs text-slate-400 mb-4">重新開啟工具箱後仍可復原。若檔案內容已變更或原檔名被占用，會停止復原並說明原因。</p><div id="renameHistory" class="space-y-3"></div></section>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/tool-ui.js') }}"></script><script src="{{ url_for('static', filename='js/batch-rename.js') }}"></script>{% endblock %}

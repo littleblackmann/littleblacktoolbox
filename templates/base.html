@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="toolbox-token" content="{{ local_action_token }}">
     <title>{% block title %}小黑工具箱{% endblock %}</title>
     <script src="{{ url_for('static', filename='js/tailwind.js') }}"></script>
     <script src="{{ url_for('static', filename='js/lucide.min.js') }}"></script>
@@ -29,7 +30,7 @@
             --border: #1e293b;
             --border-hover: #334155;
             --text: #f1f5f9;
-            --text-dim: #64748b;
+            --text-dim: #94a3b8;
             --accent: #3b82f6;
             --accent-light: #60a5fa;
             --accent-glow: rgba(59, 130, 246, 0.15);
@@ -197,6 +198,8 @@
 
         {% block extra_css %}{% endblock %}
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workshops.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
 </head>
 <body>
     <div class="content-wrapper min-h-screen flex flex-col">
@@ -205,48 +208,18 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between h-14">
                     <div class="flex items-center gap-6">
-                        <a href="/" class="flex items-center gap-2 no-underline">
+                        <a href="/" class="flex items-center gap-2 no-underline" aria-label="小黑工具箱首頁">
                             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
                                 <i data-lucide="box" class="w-4 h-4 text-white"></i>
                             </div>
                             <span class="nav-logo font-bold text-lg tracking-tight">小黑工具箱</span>
                         </a>
-                        <div class="hidden xl:flex items-center gap-1">
-                            <a href="/" class="nav-link {% block nav_home %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> 首頁</span>
-                            </a>
-                            <a href="/tool/bg-remover" class="nav-link {% block nav_bg %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="eraser" class="w-3.5 h-3.5"></i> AI 去背</span>
-                            </a>
-                            <a href="/tool/png-to-ico" class="nav-link {% block nav_ico %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="layers" class="w-3.5 h-3.5"></i> PNG 轉 ICO</span>
-                            </a>
-                            <a href="/tool/text-converter" class="nav-link {% block nav_text %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="file-text" class="w-3.5 h-3.5"></i> 文字轉檔</span>
-                            </a>
-                            <a href="/tool/qrcode" class="nav-link {% block nav_qr %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="qr-code" class="w-3.5 h-3.5"></i> QR Code</span>
-                            </a>
-                            <a href="/tool/ocr" class="nav-link {% block nav_ocr %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="scan-text" class="w-3.5 h-3.5"></i> OCR</span>
-                            </a>
-                            <a href="/tool/image-workshop" class="nav-link {% block nav_image %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="images" class="w-3.5 h-3.5"></i> 圖片處理</span>
-                            </a>
-                            <a href="/tool/pdf-workshop" class="nav-link {% block nav_pdf %}{% endblock %}">
-                                <span class="flex items-center gap-1.5"><i data-lucide="files" class="w-3.5 h-3.5"></i> PDF</span>
-                            </a>
-                        </div>
-                        <select aria-label="切換工具" class="xl:hidden bg-slate-900 border border-slate-700 rounded-lg text-xs p-2 max-w-28" onchange="location.href=this.value">
-                            {% for path, label in [('/', '工具首頁'), ('/tool/bg-remover', 'AI 去背'), ('/tool/png-to-ico', 'PNG 轉 ICO'), ('/tool/text-converter', '文字轉檔'), ('/tool/qrcode', 'QR Code'), ('/tool/ocr', 'OCR'), ('/tool/image-workshop', '圖片處理'), ('/tool/pdf-workshop', 'PDF 工具')] %}
-                            <option value="{{ path }}" {% if request.path == path %}selected{% endif %}>{{ label }}</option>
-                            {% endfor %}
+                        <select aria-label="切換工具" class="nav-select" onchange="location.href=this.value">
+                            <option value="/" {% if request.path == '/' %}selected{% endif %}>工具首頁</option>
+                            {% for tool in tool_catalog %}<option value="{{ tool.path }}" {% if request.path == tool.path %}selected{% endif %}>{{ tool.name }}</option>{% endfor %}
                         </select>
                     </div>
-                    <div class="flex items-center gap-2 text-xs text-slate-500">
-                        <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
-                        <span class="hidden 2xl:inline">工具離線可用</span>
-                    </div>
+                    <button id="openToolSearch" class="search-trigger" aria-label="搜尋工具"><i data-lucide="search" class="w-4 h-4"></i><span>搜尋工具</span><kbd>Ctrl K</kbd></button>
                 </div>
             </div>
         </nav>
@@ -275,11 +248,15 @@
             </div>
         </div>
 
-        <footer class="border-t border-slate-800/50 py-4 text-center text-xs text-slate-600">
-            小黑工具箱 <span id="footer-version">v1.0.0</span> &mdash; 本地離線運作，你的檔案不會上傳到任何地方。
+        <footer class="border-t border-slate-800/50 py-4 text-center text-xs text-slate-400 px-4">
+            小黑工具箱 <span id="footer-version">v{{ app_version }}</span> &mdash; 本地離線運作，你的檔案不會上傳到任何地方。
         </footer>
     </div>
 
+    <dialog id="toolSearchDialog" class="tool-search-dialog"><div class="p-5"><div class="flex items-center justify-between mb-3"><label for="toolSearchInput" class="font-semibold">搜尋工具</label><button id="closeToolSearch" class="tool-secondary" aria-label="關閉搜尋">Esc</button></div><input id="toolSearchInput" class="tool-field" placeholder="輸入工具名稱或用途，例如：縮圖、改名"><div id="toolSearchResults" class="search-results mt-3"></div><p class="text-xs text-slate-400 mt-3">↑ ↓ 選擇 · Enter 開啟 · Esc 關閉</p></div></dialog>
+    <script>window.ToolCatalog = {{ tool_catalog | tojson }};</script>
+    <script src="{{ url_for('static', filename='js/preferences.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/navigation.js') }}"></script>
     <script>
         lucide.createIcons();
 

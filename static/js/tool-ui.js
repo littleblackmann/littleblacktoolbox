@@ -1,5 +1,9 @@
 /* Shared local file tools UI. */
 window.ToolUI = {
+    failure(error) {
+        if (error?.name === 'TypeError' && /fetch|network|load failed/i.test(error.message)) return '無法連線工具箱，請確認程式仍在執行，再按重試';
+        return error?.message || '處理失敗，請稍後再試';
+    },
     bytes(value) {
         if (value < 1024) return `${value} B`;
         if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;

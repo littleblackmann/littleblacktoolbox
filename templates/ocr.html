@@ -396,6 +396,8 @@
         if (actives.length === 0) {
             btn.classList.add('active');
         }
+        ToolPrefs.write('ocr.languages', getSelectedLangs());
+        document.querySelectorAll('.lang-option').forEach(button => button.setAttribute('aria-pressed', String(button.classList.contains('active'))));
     }
 
     function getSelectedLangs() {
@@ -528,6 +530,9 @@
         lucide.createIcons();
     }
 
+    const savedLanguages = ToolPrefs.read('ocr.languages', ['ch_tra', 'en']);
+    if (savedLanguages.length && savedLanguages.every(lang => ['ch_tra','ch_sim','en','ja','ko'].includes(lang)) && savedLanguages.filter(lang => lang !== 'en').length <= 1) document.querySelectorAll('.lang-option').forEach(button => button.classList.toggle('active', savedLanguages.includes(button.dataset.lang)));
+    document.querySelectorAll('.lang-option').forEach(button => button.setAttribute('aria-pressed', String(button.classList.contains('active'))));
     window.addEventListener('beforeunload', () => {
         if (previewUrl) URL.revokeObjectURL(previewUrl);
     });

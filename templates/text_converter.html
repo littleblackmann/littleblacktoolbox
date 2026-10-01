@@ -441,6 +441,8 @@ const dropZone = $('dropZone');
 const fileInput = $('fileInput');
 const fileTag = $('fileTag');
 const pdfNotice = $('pdfNotice');
+const saveTextSettings = ToolPrefs.fields('text.settings', ['inputFormat', 'outputFormat']);
+pdfNotice.classList.toggle('show', outputFormat.value === 'pdf');
 
 let currentOutput = '';
 let convertedFormat = '';
@@ -476,6 +478,7 @@ outputFormat.addEventListener('change', () => {
 inputFormat.addEventListener('change', () => {
     invalidateOutput();
     autoSuggestOutput();
+    saveTextSettings();
 });
 
 function autoSuggestOutput() {
@@ -857,6 +860,7 @@ $('swapBtn').addEventListener('click', () => {
     if (currentOutput) { inputText.value = currentOutput; inputText.dispatchEvent(new Event('input')); }
     pdfNotice.classList.toggle('show', outputFormat.value === 'pdf');
     toast('已交換格式');
+    saveTextSettings();
 });
 
 $('copyBtn').addEventListener('click', () => {

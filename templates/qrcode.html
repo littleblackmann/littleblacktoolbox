@@ -383,8 +383,14 @@
         document.querySelectorAll('.size-option').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         resetQR();
+        ToolPrefs.write('qr.size', currentSize);
     }
 
+    ToolPrefs.fields('qr.colors', ['fgColor','bgColor']);
+    const savedQrSize = ToolPrefs.read('qr.size', 300);
+    const sizeButton = document.querySelector(`.size-option[data-size="${Number(savedQrSize)}"]`);
+    if (sizeButton) setSize(Number(savedQrSize), sizeButton);
+    onInputChange();
     // ── 生成 QR Code ──
     function generateQR() {
         const text = qrInput.value.trim();

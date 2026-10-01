@@ -19,7 +19,7 @@ def main():
     with tempfile.TemporaryDirectory() as directory:
         client = app.test_client()
         for path in ('/', '/tool/bg-remover', '/tool/png-to-ico', '/tool/text-converter',
-                     '/tool/qrcode', '/tool/ocr', '/tool/image-workshop', '/tool/pdf-workshop'):
+                     '/tool/qrcode', '/tool/ocr', '/tool/image-workshop', '/tool/pdf-workshop', '/tool/image-editor', '/tool/batch-rename'):
             html = client.get(path).get_data(as_text=True)
             for index, script in enumerate(re.findall(r'<script(?:\s[^>]*)?>(.*?)</script>', html, re.S)):
                 if not script.strip():

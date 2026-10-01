@@ -1,5 +1,6 @@
 """Verify release CRCs/hashes, current frontend assets, and public patch baseline."""
 import hashlib
+import argparse
 import json
 import sys
 import zipfile
@@ -19,15 +20,18 @@ def digest(stream):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--base-version', default='1.1.0')
+    base_version = parser.parse_args().base_version
     version = json.loads((ROOT / 'version.json').read_text(encoding='utf-8'))['version']
     manifest = json.loads((ROOT / f'build_manifest_v{version}.json').read_text(encoding='utf-8'))
-    base = json.loads((ROOT / 'build_manifest_v1.0.1.json').read_text(encoding='utf-8'))
+    base = json.loads((ROOT / f'build_manifest_v{base_version}.json').read_text(encoding='utf-8'))
     prefix = auto_updater.APP_NAME + '/'
-    report = {'version': version, 'base_version': '1.0.1', 'files': len(manifest), 'assets': []}
+    report = {'version': version, 'base_version': base_version, 'files': len(manifest), 'assets': []}
     for suffix in ('', '_patch'):
         path = ROOT / f'小黑工具箱_v{version}{suffix}.zip'
         with zipfile.ZipFile(path) as archive:
-            with patch.object(auto_updater, 'get_current_version', return_value='1.0.1'):
+            with patch.object(auto_updater, 'get_current_version', return_value=base_version):
                 auto_updater._validate_archive(archive, version, bool(suffix))
             for entry in archive.infolist():
                 relative = entry.filename.removeprefix(prefix)

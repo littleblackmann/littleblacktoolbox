@@ -3,6 +3,19 @@
     const items = [];
     let busy = false, processing = false, controller = null;
     const message = (text, error = false) => ToolUI.message($('imageMessage'), text, error);
+    const fieldIds = ['imageFormat', 'imagePreset', 'imageWidth', 'imageHeight', 'imageQuality', 'imageBackground', 'imageMetadata', 'imageRemoveBg'];
+    const saveSettings = ToolPrefs.fields('image.settings', fieldIds);
+    let recipes = ToolPrefs.read('image.recipes', []).filter(recipe => typeof recipe?.name === 'string' && recipe.settings && typeof recipe.settings === 'object').slice(0, 10);
+    function settings() { return Object.fromEntries(fieldIds.map(id => [id, $(id).type === 'checkbox' ? $(id).checked : $(id).value])); }
+    function applySettings(values) { for (const id of fieldIds) if (Object.hasOwn(values, id)) { if ($(id).type === 'checkbox') $(id).checked = Boolean(values[id]); else { const before = $(id).value; $(id).value = values[id]; if (!$(id).checkValidity() || !$(id).value) $(id).value = before; } } $('imageQualityValue').textContent = $('imageQuality').value; saveSettings(); }
+    function listRecipes() { $('imageRecipe').querySelectorAll('option[data-saved]').forEach(option => option.remove()); recipes.forEach((recipe, index) => { const option = document.createElement('option'); option.value = `saved:${index}`; option.dataset.saved = 'true'; option.textContent = recipe.name; $('imageRecipe').append(option); }); }
+    function preset(key) { if (['share', 'transparent'].includes(key)) applySettings({imageFormat: 'WEBP', imagePreset: '1280', imageWidth: '1280', imageHeight: '1280', imageQuality: '85', imageMetadata: false, imageRemoveBg: key === 'transparent'}); else if (key.startsWith('saved:') && recipes[Number(key.slice(6))]) applySettings(recipes[Number(key.slice(6))].settings); }
+    listRecipes(); $('imageQualityValue').textContent = $('imageQuality').value;
+    const requestedPreset = new URLSearchParams(location.search).get('preset');
+    if (['share', 'transparent'].includes(requestedPreset)) { $('imageRecipe').value = requestedPreset; preset(requestedPreset); }
+    $('imageRecipe').addEventListener('change', () => preset($('imageRecipe').value));
+    fieldIds.forEach(id => $(id).addEventListener('input', () => { $('imageRecipe').value = 'custom'; if (items.some(item => item.output)) message('設定已變更，請重新處理圖片以套用'); }));
+    $('saveImageRecipe').addEventListener('click', () => { const name = $('imageRecipeName').value.trim(); if (!name) { message('請輸入流程名稱', true); return; } recipes = recipes.filter(recipe => recipe.name !== name); recipes.unshift({name, settings: settings()}); recipes = recipes.slice(0, 10); if (!ToolPrefs.write('image.recipes', recipes)) { message('瀏覽器無法儲存設定，請確認未停用本機儲存', true); return; } listRecipes(); $('imageRecipe').value = 'saved:0'; message(`已儲存「${name}」，下次可直接套用`); });
     function release(item) {
         if (item.originalURL) URL.revokeObjectURL(item.originalURL);
         if (item.outputURL) URL.revokeObjectURL(item.outputURL);
@@ -12,6 +25,9 @@
         $('imageSettings').disabled = busy;
         $('processImages').disabled = busy || !items.length;
         $('cancelImages').classList.toggle('hidden', !processing);
+        $('retryImages').classList.toggle('hidden', !items.some(item => item.error));
+        $('retryImages').disabled = busy;
+        $('imageProgress').classList.toggle('hidden', !processing);
         $('clearImages').disabled = busy || !items.length;
         $('zipImages').disabled = busy || !items.some(item => item.output);
         const ready = items.filter(item => item.output).length;
@@ -37,6 +53,7 @@
                 download.addEventListener('click', () => ToolUI.download(item.output, item.name));
                 row.querySelector('div.flex.gap-2').append(download);
             } else texts[2].textContent = item.error || item.status || '等待處理';
+            if (item.error) { const retry = document.createElement('button'); retry.className = 'tool-secondary'; retry.textContent = '重試'; retry.disabled = busy; retry.addEventListener('click', () => process([item])); row.querySelector('div.flex.gap-2').append(retry); }
             const remove = document.createElement('button');
             remove.className = 'tool-secondary'; remove.textContent = '移除'; remove.disabled = busy;
             remove.addEventListener('click', () => { release(item); items.splice(index, 1); render(); });
@@ -54,50 +71,56 @@
         valid.forEach(file => items.push({file, originalURL: URL.createObjectURL(file)}));
         render();
     }
-    ToolUI.upload($('imageDrop'), $('imageFiles'), add);
+    ToolUI.upload($('imageDrop'), $('imageFiles'), add, true);
     $('imageQuality').addEventListener('input', () => $('imageQualityValue').textContent = $('imageQuality').value);
     $('imagePreset').addEventListener('change', () => {
         if ($('imagePreset').value !== 'custom') $('imageWidth').value = $('imageHeight').value = $('imagePreset').value;
+        saveSettings();
     });
     for (const id of ['imageWidth', 'imageHeight']) $(id).addEventListener('input', () => $('imagePreset').value = 'custom');
     $('clearImages').addEventListener('click', () => { items.forEach(release); items.length = 0; message(''); render(); });
     $('cancelImages').addEventListener('click', () => controller?.abort());
-    $('processImages').addEventListener('click', async () => {
+    async function process(targets) {
         if (busy || !items.length) return;
         if (!['imageWidth', 'imageHeight'].every(id => $(id).checkValidity() && $(id).value !== '' && Number.isInteger(Number($(id).value)))) {
             message('寬度與高度請填 0 到 10000 的整數', true); return;
         }
-        const settings = {format: $('imageFormat').value, quality: $('imageQuality').value,
+        const options = {format: $('imageFormat').value, quality: $('imageQuality').value,
             max_width: $('imageWidth').value, max_height: $('imageHeight').value,
             background: $('imageBackground').value, keep_metadata: $('imageMetadata').checked ? '1' : '0'};
         controller = new AbortController(); busy = true; processing = true;
         let cancelled = false;
-        for (const item of items) {
+        saveSettings(); $('imageProgress').max = targets.length; $('imageProgress').value = 0;
+        for (const item of targets) {
             if (item.outputURL) URL.revokeObjectURL(item.outputURL);
             item.output = item.outputURL = null; item.error = ''; item.status = '等待處理';
         }
-        for (let index = 0; index < items.length; index++) {
-            const item = items[index];
+        for (let index = 0; index < targets.length; index++) {
+            const item = targets[index];
             item.status = '處理中…';
-            render(); message(`正在處理第 ${index + 1} / ${items.length} 張…`);
+            render(); message(`正在處理第 ${index + 1} / ${targets.length} 張…`);
             const data = new FormData(); data.append('image', item.file);
-            Object.entries(settings).forEach(([key, value]) => data.append(key, value));
+            Object.entries(options).forEach(([key, value]) => data.append(key, value));
             try {
+                if ($('imageRemoveBg').checked) { item.status = 'AI 去背中…'; render(); const bgData = new FormData(); bgData.append('image', item.file); const bg = await fetch('/api/remove-bg', {method: 'POST', body: bgData, signal: controller.signal}); if (!bg.ok) throw new Error(await ToolUI.error(bg)); const value = await bg.json(); const removed = await (await fetch(value.image, {signal: controller.signal})).blob(); data.set('image', removed, 'removed.png'); item.status = '縮圖與轉檔中…'; render(); }
                 const response = await fetch('/api/image-process', {method: 'POST', body: data, signal: controller.signal});
                 if (!response.ok) throw new Error(await ToolUI.error(response));
                 item.output = await response.blob(); item.outputURL = URL.createObjectURL(item.output);
                 item.width = response.headers.get('X-Image-Width'); item.height = response.headers.get('X-Image-Height');
                 const ext = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp'}[item.output.type];
                 item.name = `${ToolUI.filename(item.file.name).replace(/\.[^.]+$/, '')}_processed.${ext}`;
+                $('imageProgress').value = index + 1;
             } catch (error) {
                 if (error.name === 'AbortError') { item.status = '已停止'; cancelled = true; break; }
-                item.error = error.message;
+                item.error = ToolUI.failure(error);
             }
         }
         busy = false; processing = false; render();
         const ready = items.filter(item => item.output).length;
         message(`${cancelled ? '已停止' : '處理完成'}，${ready} / ${items.length} 張可下載`, ready === 0);
-    });
+    }
+    $('processImages').addEventListener('click', () => process(items));
+    $('retryImages').addEventListener('click', () => process(items.filter(item => item.error)));
     $('zipImages').addEventListener('click', async () => {
         busy = true; render(); message('正在準備 ZIP…');
         try {

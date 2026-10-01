@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}圖片標註 — 小黑工具箱{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <a href="/" class="back-btn mb-4"><i data-lucide="arrow-left" class="w-4 h-4"></i> 返回工具箱</a>
+    <div class="flex flex-wrap justify-between gap-3 mb-6"><div><h1 class="text-3xl font-bold mb-2">圖片標註</h1><p class="text-slate-400">貼上截圖，加上箭頭、說明或遮蔽內容，再匯出原解析度圖片。</p></div></div>
+    <input id="editorFile" type="file" accept="image/png,image/jpeg,image/webp" class="hidden">
+    <div id="editorDrop" class="tool-drop mb-5" role="button" tabindex="0" aria-label="加入要標註的圖片"><p class="text-slate-200 font-medium">拖入圖片、點擊選擇，或 Ctrl+V 貼上截圖</p><p class="text-xs mt-2">PNG／JPG／WebP · 單張最多 50 MB、3000 萬像素 · 換圖會重設標註</p></div>
+    <section class="glass p-4 sm:p-5">
+        <fieldset id="editorSettings" disabled>
+            <div id="editorTools" class="flex flex-wrap gap-2 mb-4" aria-label="標註工具">{% for key,label in [('arrow','箭頭'),('rect','框選'),('pen','畫筆'),('text','文字'),('mosaic','馬賽克'),('cover','實色遮蔽'),('crop','裁切')] %}<button type="button" class="editor-tool" data-tool="{{key}}" aria-pressed="{{'true' if key=='arrow' else 'false'}}">{{label}}</button>{% endfor %}</div>
+            <div class="flex flex-wrap gap-4 items-end mb-4">
+                <div><label for="editorColor" class="tool-label">顏色</label><input id="editorColor" type="color" value="#ef4444" class="h-9 w-14 rounded"></div>
+                <div><label for="editorWidth" class="tool-label">線條 px</label><input id="editorWidth" type="number" min="1" max="60" value="4" class="tool-field w-20"></div>
+                <div><label for="editorTextSize" class="tool-label">文字 px</label><input id="editorTextSize" type="number" min="10" max="240" value="32" class="tool-field w-20"></div>
+                <div class="flex-1 min-w-[150px]"><label for="editorText" class="tool-label">要加入的文字（選擇文字工具後點圖）</label><input id="editorText" maxlength="500" class="tool-field" placeholder="例如：點這裡開啟設定"></div>
+                <button id="editorUndo" class="tool-secondary" type="button" disabled>復原</button><button id="editorRedo" class="tool-secondary" type="button" disabled>重做</button>
+            </div>
+        </fieldset>
+        <p id="editorHint" class="text-sm text-slate-400 mb-4">加入圖片後，在畫面上拖曳繪製箭頭。</p>
+        <div class="editor-stage"><canvas id="editorCanvas" width="1" height="1" class="hidden" aria-label="圖片標註畫布"></canvas><p id="editorEmpty" class="text-sm text-slate-400 my-auto">圖片會顯示在這裡</p></div>
+        <div class="flex flex-wrap items-end gap-3 mt-5">
+            <div class="flex-1 min-w-[150px]"><label for="editorName" class="tool-label">輸出檔名</label><input id="editorName" class="tool-field" value="標註圖片"></div>
+            <div><label for="editorFormat" class="tool-label">格式</label><select id="editorFormat" class="tool-field"><option value="png">PNG（保留透明）</option><option value="jpeg">JPG（白色背景）</option><option value="webp">WebP（保留透明）</option></select></div>
+            <button id="editorDownload" class="btn-primary" disabled>下載圖片</button><button id="editorCopy" class="tool-secondary" disabled>複製圖片</button>
+        </div>
+        <p id="editorMessage" class="tool-message" role="status" aria-live="polite"></p>
+        <p class="text-xs text-slate-400 mt-3">遮蔽敏感文字建議使用「實色遮蔽」。匯出為合成後的圖片，不保留原始標註圖層或拍攝資訊。</p>
+    </section>
+</div>
+{% endblock %}
+{% block extra_js %}<script src="{{ url_for('static', filename='js/tool-ui.js') }}"></script><script src="{{ url_for('static', filename='js/image-editor.js') }}"></script>{% endblock %}

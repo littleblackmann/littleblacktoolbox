@@ -14,6 +14,7 @@ import json
 import base64
 import webbrowser
 import threading
+import secrets
 from io import BytesIO
 from flask import Flask, render_template, request, jsonify
 from PIL import Image, UnidentifiedImageError
@@ -42,8 +43,18 @@ template_folder = os.path.join(BASE_DIR, 'templates')
 static_folder = os.path.join(BASE_DIR, 'static')
 
 app = Flask(__name__, template_folder=template_folder, static_folder=static_folder)
+app.config['LOCAL_ACTION_TOKEN'] = secrets.token_urlsafe(32)
 from tools_api import tools
 app.register_blueprint(tools)
+from rename_api import rename_tools
+from tool_catalog import TOOLS
+app.register_blueprint(rename_tools)
+
+
+@app.context_processor
+def shared_ui():
+    from updater.auto_updater import get_current_version
+    return dict(tool_catalog=TOOLS, local_action_token=app.config['LOCAL_ACTION_TOKEN'], app_version=get_current_version())
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 最大上傳 50MB
 MAX_IMAGE_PIXELS = 30_000_000
 SUPPORTED_IMAGE_FORMATS = {'PNG', 'JPEG', 'WEBP'}
@@ -170,6 +181,11 @@ def qrcode_page():
 @app.route('/tool/ocr')
 def ocr_page():
     return render_template('ocr.html')
+
+
+@app.route('/tool/image-editor')
+def image_editor_page():
+    return render_template('image_editor.html')
 
 # ─── API 路由 ───────────────────────────────────────
 
